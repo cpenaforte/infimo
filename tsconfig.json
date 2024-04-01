@@ -1,0 +1,26 @@
+{
+    "compilerOptions": {
+        "module": "commonjs",
+        "target": "ESNext",
+        "rootDir": "src",
+        "outDir": "lib",
+        "noImplicitAny": true,
+        "removeComments": true,
+        "preserveConstEnums": true,
+        "sourceMap": true,
+        "declaration": true,
+        "strictNullChecks": true,
+        "allowUnreachableCode": false,
+        "alwaysStrict": true,
+        "noUnusedLocals": true,
+        "strictFunctionTypes": true,
+        "strictPropertyInitialization": true,
+    },
+    "include": [
+        "src/**/*.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist"
+    ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "infimo",
+  "version": "1.0.0",
+  "description": "minimal js framework for reactive html templates",
+  "main": "index.js",
+  "author": "Carlos Penaforte (cpenaforte)",
+  "license": "MIT",
+  "scripts": {
+    "build": "webpack"
+  },
+  "devDependencies": {
+    "awesome-typescript-loader": "^5.2.1",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.4.3",
+    "uglifyjs-webpack-plugin": "^2.2.0",
+    "webpack": "^5.91.0",
+    "webpack-cli": "^5.1.4"
+  }
+}

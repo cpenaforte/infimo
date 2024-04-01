@@ -1,7 +1,7 @@
 import { DataProp, PropType, Listeners, InfimoObject } from "./types";
 import NameRegister from "./subclasses/NameRegister";
 import Ref from "./subclasses/Ref";
-import { basicParamParse } from "./utils";
+import VirtualMachine from "./subclasses/VirtualMachine";
 
 class InfimoFactory {
     private appId: string | undefined;
@@ -74,12 +74,18 @@ class InfimoFactory {
     private methodsParse(method: [string, Function]): void {
         const [name, value] = method;
 
+        const refThis = this;
+
+        const parsedFunction = (...args: any) => value.call(refThis, ...args);
+
         const registeredName = this.namesRegister.registerName(name, PropType.METHODS);
 
-        const methodRef = new Ref(registeredName, value);
+        const methodRef = new Ref(registeredName, parsedFunction);
         this.refs.push(methodRef);
 
-        Object.defineProperty(this, name, methodRef.getValue());
+        Object.defineProperty(this, name, {
+            get: () => methodRef.getValue()
+        });
     }
 
     methods(methodsProp: { [key: string]: Function }): void {
@@ -89,31 +95,13 @@ class InfimoFactory {
     private parseTemplate(): string {
         const intermediate = `${this.template}`;
 
+        const vm = new VirtualMachine();
+        vm.initThis(this);
+
         return intermediate.replace(/{{(.*?)}}/g, (match) => {
-            let rebuiltString = match;
+            const evalutated = vm.runScriptSync(match);
 
-            this.refs.forEach(ref => {
-                if (rebuiltString.includes(ref.getName().name)) {
-                    if (typeof ref.getValue() === "function") {
-                        // use ref.getName().name to create a regex to find the function params then replace it with the function call
-                        const regex = new RegExp(`${ref.getName().name}\\((.*?)\\)`, "g");
-                        const matched = rebuiltString.match(regex) || [];
-                        
-                        const functionParams = matched.map((match: string) => {
-                            const paramsNamesList = match.replace(`${ref.getName().name}(`, "").replace(")", "").split(",").map((p: string) => p.trim());
-                            return paramsNamesList.map((p: string) => {
-                                return basicParamParse(p, this.refs);
-                            });
-                        });
-
-                        rebuiltString = rebuiltString.replace(regex, ref.getValue()(...functionParams));
-                    } else {
-                        rebuiltString = rebuiltString.replace(`${ref.getName().name}`, ref.getValue());
-                    }
-                }
-            });
-
-            return rebuiltString;
+            return `${evalutated}`;
         }).replace(/{{/g, "").replace(/}}/g, "");
     }
 

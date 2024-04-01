@@ -1,6 +1,7 @@
 //webpack.config.js
 const path = require('path');
 const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
+const NodePolyfillPlugin = require('node-polyfill-webpack-plugin');
 
 module.exports = {
   mode: 'development',
@@ -23,7 +24,10 @@ module.exports = {
     new UglifyJsPlugin({
       sourceMap: true,
       include: /\.min\.js$/,
-    })
+    }),
+    new NodePolyfillPlugin({
+			includeAliases: ['vm']
+		})
   ],
   module: {
     rules: [{

@@ -60,7 +60,7 @@ class InfimoFactory {
         const [name, value] = watch;
 
         if (!this.namesRegister.nameExist(name)) {
-            throw new Error(`Name ${name} does not exist`);
+            throw new Error(`Data ${name} does not exist`);
         }
 
         if (!this.listeners[name]) {
@@ -105,23 +105,36 @@ class InfimoFactory {
 
         
         // Putting uuid in all elements
-        const intermediate2 = intermediate.replace(/<\w+.*?<\//g, (match) => {
-            const uuid = uuidv4();
+        const intermediate2 = intermediate.replace(/<\w+.*?>/g, (match) => {
+            const refThis = this;
 
-            this.refs.forEach(ref => {
-                // verify if ref is contained in the match and put uuid into associatedElementsUuid
-                if (match.includes(ref.getName().name)) {
-                    ref.addAssociatedElementUuid(`el-${uuid}`);
-                }
-            });
+            if (match.includes("data-uuid")) return match;
+            
+            return match.replace(/[^=]>/, (match2) => match2.replace(">", (match3) => {
+                const uuid = uuidv4();
 
-            return match.replace(/[^=]>/, (matchStr) => matchStr.replace(">", ` data-uuid="el-${uuid}">`));
+                refThis.refs.forEach(ref => {
+                    // verify if ref is contained in the match and put uuid into associatedElementsUuid
+                    if (match.includes(ref.getName().name)) {
+                        ref.addAssociatedElementUuid(`el-${uuid}`);
+                    }
+                });
+
+                return ` data-uuid="el-${uuid}">`;
+            }));
         });
 
-        this.template = intermediate2;
+        if (!specificTemplate) this.template = intermediate2;
+
+        const intermediate3 = intermediate2.replace(/custom-attr="(.*?)"/g, (match, p1) => {
+            const parsedCatchGroup = p1.replace(/{{/g, "").replace(/}}/g, "");
+            const evalutated = vm.runScriptSync(parsedCatchGroup);
+
+            return `${evalutated}`;
+        });
 
         // Parsing {{}}
-        const intermediate3 = intermediate2.replace(/{{(.*?)}}/g, (match) => {
+        const intermediate4 = intermediate3.replace(/{{(.*?)}}/g, (match) => {
             const evalutated = vm.runScriptSync(match);
 
             return `${evalutated}`;
@@ -129,7 +142,7 @@ class InfimoFactory {
 
 
         // Parsing action attributes
-        return intermediate3.replace(/@.*?="(.*?)"/g, (match, p1) => {
+        return intermediate4.replace(/@.*?="(.*?)"/g, (match, p1) => {
             const newMatch = match.replace("@", "on");
 
             return newMatch;
@@ -146,7 +159,10 @@ class InfimoFactory {
         const element = step.firstElementChild;
 
         if (element) {
-            document.querySelector(this.appId)?.appendChild(element);
+            const app = document.querySelector(this.appId);
+            if (app) {
+                app.parentElement?.replaceChild(element, app);
+            }
 
             Object.assign(appThis, this);
         }
@@ -164,7 +180,7 @@ class InfimoFactory {
             const virtualElement = virtualTemplate.querySelector(`[data-uuid="${uuid}"]`);
 
             if (virtualElement) {
-                const parsedOuterHTML = this.parseTemplate(virtualElement.outerHTML);
+                const parsedOuterHTML = this.parseTemplate(virtualElement.outerHTML.replace(/=""/g, ""));
 
                 const documentElement = document.querySelector(`[data-uuid="${uuid}"]`);
     

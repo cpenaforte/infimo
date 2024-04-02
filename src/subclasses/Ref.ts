@@ -36,6 +36,8 @@ export default class Ref<T> {
     }
 
     addAssociatedElementUuid(associatedElementUuid: string): void {
-        this.associatedElementsUuid.push(associatedElementUuid);
+        if (!this.associatedElementsUuid.includes(associatedElementUuid)) {
+            this.associatedElementsUuid.push(associatedElementUuid);
+        }
     }
 }

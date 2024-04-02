@@ -1,3 +1,2 @@
 # Infimo
-## About
-A minimal js framework to create reactive html templates.
+A minimal js reactive lib for CDN and SEO focused websites

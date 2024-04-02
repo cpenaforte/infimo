@@ -1,3 +1,5 @@
 node_modules
 _bundles
 lib
+
+yarn-error.log

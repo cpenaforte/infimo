@@ -49,7 +49,7 @@ class InfimoFactory {
         });
     }
 
-    data(dataProp: DataProp): void {
+    private data(dataProp: DataProp): void {
         Object.entries(dataProp).forEach(data => this.dataParse(data));
     }
 
@@ -67,7 +67,7 @@ class InfimoFactory {
         this.listeners[name].push(value);
     }
 
-    watch(watchProp: { [key: string]: (newValue?: any, oldValue?: any) => void }): void {
+    private watch(watchProp: { [key: string]: (newValue?: any, oldValue?: any) => void }): void {
         Object.entries(watchProp).forEach(watch => this.watchParse(watch));
     }
 
@@ -88,7 +88,7 @@ class InfimoFactory {
         });
     }
 
-    methods(methodsProp: { [key: string]: Function }): void {
+    private methods(methodsProp: { [key: string]: Function }): void {
         Object.entries(methodsProp).forEach(method => this.methodsParse(method));
     }
 

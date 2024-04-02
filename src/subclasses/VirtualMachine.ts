@@ -8,13 +8,7 @@ export default class VirtualMachine {
     }
 
     initThis(thisObj: { [key: string]: any }): void {
-        const descriptors = Object.getOwnPropertyDescriptors(thisObj);
-        const parseDescriptors = Object.entries(descriptors).map(([key, value]) => {
-            const newValue = value.get ? value.get() : value.value;
-            return [key, newValue];
-        });
-
-        this.context = Object.fromEntries(parseDescriptors);
+        this.context = thisObj;
     }
 
     runScriptSync(script: string): any {

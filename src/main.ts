@@ -29,7 +29,7 @@ class InfimoFactory {
             this.listeners[dataRef.getName().name].forEach(listener => listener(newValue, oldValue));
         }
 
-        this.appId && this.hydrate(this.appId, dataRef);
+        if(newValue !== oldValue) this.hydrate(dataRef);
     }
 
     private dataParse<T>(data: [string, T]): void {
@@ -40,7 +40,7 @@ class InfimoFactory {
         const dataRef = new Ref(registeredName, value);
         this.refs.push(dataRef);
 
-        Object.assign(this, {
+        Object.defineProperties(this, {
             [name]: {
                 get: () => dataRef.getValue(),
                 set: (newValue: T) => {
@@ -86,7 +86,9 @@ class InfimoFactory {
         const methodRef = new Ref(registeredName, parsedFunction);
         this.refs.push(methodRef);
 
-        Object.assign(this, name, {
+        Object.assign(window, { [name]: methodRef.getValue() });
+
+        Object.defineProperty(this, name, {
             get: () => methodRef.getValue()
         });
     }
@@ -101,23 +103,40 @@ class InfimoFactory {
         const vm = new VirtualMachine();
         vm.initThis(this);
 
+        
         // Putting uuid in all elements
-        const intermediate2 = intermediate.replace(/<.*?>/g, (match) => {
+        const intermediate2 = intermediate.replace(/<\w+.*?<\//g, (match) => {
             const uuid = uuidv4();
 
-            return match.replace(" ", ` data-uuid="el-${uuid}" `);
+            this.refs.forEach(ref => {
+                // verify if ref is contained in the match and put uuid into associatedElementsUuid
+                if (match.includes(ref.getName().name)) {
+                    ref.addAssociatedElementUuid(`el-${uuid}`);
+                }
+            });
+
+            return match.replace(/[^=]>/, (matchStr) => matchStr.replace(">", ` data-uuid="el-${uuid}">`));
         });
 
+        this.template = intermediate2;
+
         // Parsing {{}}
-        return intermediate2.replace(/{{(.*?)}}/g, (match) => {
+        const intermediate3 = intermediate2.replace(/{{(.*?)}}/g, (match) => {
             const evalutated = vm.runScriptSync(match);
 
             return `${evalutated}`;
         }).replace(/{{/g, "").replace(/}}/g, "");
 
+
+        // Parsing action attributes
+        return intermediate3.replace(/@.*?="(.*?)"/g, (match, p1) => {
+            const newMatch = match.replace("@", "on");
+
+            return newMatch;
+        });
     }
 
-    build(appId: string): void {
+    build(appThis: {[key: string] : any}, appId: string): void {
         this.appId = appId;
 
         const parsedTemplate = this.parseTemplate();
@@ -128,28 +147,32 @@ class InfimoFactory {
 
         if (element) {
             document.querySelector(this.appId)?.appendChild(element);
+
+            Object.assign(appThis, this);
         }
     }
 
-    private hydrate(appId: string, dataRef: Ref<any>): void {
+    private hydrate(dataRef: Ref<any>): void {
         const vm = new VirtualMachine();
         vm.initThis(this);
 
+        const virtualTemplate = document.createElement("div");
+        virtualTemplate.innerHTML = this.template;
+
         // Use dataRef.getAssociatedElementsUuid() to get all elements associated with the dataRef and update them
         dataRef.getAssociatedElementsUuid().forEach(uuid => {
-            // pick element using this.template and use parseTemplate to update it
-            const templateElement = this.template.replace(new RegExp(`<.*?data-uuid="el-${uuid}".*?>`), (match) => {
-                const evalutated = vm.runScriptSync(match);
+            const virtualElement = virtualTemplate.querySelector(`[data-uuid="${uuid}"]`);
 
-                return `${evalutated}`;
-            });
+            if (virtualElement) {
+                const parsedOuterHTML = this.parseTemplate(virtualElement.outerHTML);
 
-            const element = document.querySelector(`[data-uuid="el-${uuid}"]`);
-
-            // replaces the element with the new one from templateElement
-            if (element) {
-                element.outerHTML = templateElement;
+                const documentElement = document.querySelector(`[data-uuid="${uuid}"]`);
+    
+                if (documentElement) {
+                    documentElement.outerHTML = parsedOuterHTML;
+                }
             }
+
         });
     }
 }

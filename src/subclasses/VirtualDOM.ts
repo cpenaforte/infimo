@@ -4,7 +4,7 @@ import {
     replaceBracesCode,
     putUuid
 } from './../utils';
-import { InfimoObject } from './../../lib/types.d';
+import { InfimoObject } from '../types';
 import { DataProp, Listeners, PropType } from "../types";
 import NameRegister from "./NameRegister";
 import Ref from "./Ref";

@@ -1,6 +1,6 @@
 {
   "name": "infimo",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Minimal js framework for reactive html templates",
   "main": "index.js",
   "author": "Carlos Penaforte (cpenaforte)",

@@ -20,3 +20,9 @@ export type RegisteredName = {name: string, type: PropType};
 export type RegisteredNames = RegisteredName[];
 
 export type Listeners = { [key: string]: ((newValue?: any, oldValue?: any) => void)[] };
+
+export type AssociatedElement = {
+    uuid: string,
+    inTextContent: boolean,
+    inAttrNames: string[],
+}

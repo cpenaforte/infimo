@@ -1,13 +1,13 @@
-import { RegisteredName } from "../types";
+import { RegisteredName, AssociatedElement } from "../types";
 
 export default class Ref<T> {
     private name: RegisteredName;
-    private associatedElementsUuid: string[];
+    private associatedElements: AssociatedElement[];
     private value: T;
 
     constructor(name: RegisteredName, value: T) {
         this.name = name;
-        this.associatedElementsUuid = [];
+        this.associatedElements = [];
         this.value = value;
     }
 
@@ -19,8 +19,8 @@ export default class Ref<T> {
         return this.value;
     }
 
-    getAssociatedElementsUuid(): string[] {
-        return this.associatedElementsUuid;
+    getAssociatedElements(): AssociatedElement[] {
+        return this.associatedElements;
     }
 
     setName(name: RegisteredName): void {
@@ -31,13 +31,13 @@ export default class Ref<T> {
         this.value = value;
     }
 
-    setAssociatedElementsUuid(associatedElementsUuid: string[]): void {
-        this.associatedElementsUuid = associatedElementsUuid;
+    setAssociatedElements(associatedElements: AssociatedElement[]): void {
+        this.associatedElements = associatedElements;
     }
 
-    addAssociatedElementUuid(associatedElementUuid: string): void {
-        if (!this.associatedElementsUuid.includes(associatedElementUuid)) {
-            this.associatedElementsUuid.push(associatedElementUuid);
+    addAssociatedElement(associatedElement: AssociatedElement): void {
+        if (!this.associatedElements.includes(associatedElement)) {
+            this.associatedElements.push(associatedElement);
         }
     }
 }

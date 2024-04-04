@@ -2,7 +2,6 @@ import {
     updateAttributesAndChildren,
     parseAll,
     putUuid,
-    forceReactivity,
 } from './../utils';
 import { InfimoObject } from '../types';
 import { DataProp, Listeners, PropType } from "../types";

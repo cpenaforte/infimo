@@ -9,10 +9,6 @@ export const getPropertyValue = (property: string, refThis: {[key:string]: any})
     }
 }
 
-export const forceReactivity = (element: Element): void => {
-    element = element.cloneNode(true) as Element;
-}
-
 export const updateRef = (refName: string, refThis: {[key:string]: any}, value: any): void => {
     refThis[refName] = value;
 

@@ -9,20 +9,21 @@ export const getPropertyValue = (property: string, refThis: {[key:string]: any})
     }
 }
 
-export const updateRef = (refName: string, refs: Ref<any>[], refThis: {[key:string]: any}, value: any): void => {
-    refThis[refName] = value;
-
-    refs.find(ref => ref.getName().name === refName)?.setValue(value);
+export const forceReactivity = (element: Element): void => {
+    element = element.cloneNode(true) as Element;
 }
 
-export const putUuid = async (element: Element, refs: Ref<any>[]): Promise<void> => {
-    const uuid = Math.random().toString(36).substring(7);
-    element.setAttribute("data-uuid", uuid);
+export const updateRef = (refName: string, refThis: {[key:string]: any}, value: any): void => {
+    refThis[refName] = value;
 
+    refThis.refs.find((ref: Ref<any>) => ref.getName().name === refName)?.setValue(value);
+}
+
+export const associateElement = (element: Element, refs: Ref<any>[]): void => {
     for (let ref of refs) {
         // verify if ref is contained in the match and put uuid into associatedElementsUuid
         const associatedElement: AssociatedElement = {
-            uuid,
+            uuid: element.getAttribute("data-uuid") as string,
             inTextContent: false,
             inAttrNames: []
         };
@@ -45,12 +46,118 @@ export const putUuid = async (element: Element, refs: Ref<any>[]): Promise<void>
             ref.addAssociatedElement(associatedElement);
         }
     }
+}
+
+export const putUuid = async (element: Element, refs: Ref<any>[]): Promise<void> => {
+    if (!element.hasAttribute("data-uuid")) {
+        const uuid = Math.random().toString(36).substring(7);
+        element.setAttribute("data-uuid", uuid);
+    
+        associateElement(element, refs);
+    }
 
     for (let child of element.childNodes) {
         if (child.nodeType === 1) {
             await putUuid(child as Element, refs);
         }
     };
+}
+
+export const parseListRendering = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
+    const list = element.getAttribute("i-for");
+    if (!list) {
+        const key = element.getAttribute("key");
+        if (key) {
+            const item = key.split("-")[0];
+            const value = key.split("-")[1];
+
+            element.innerHTML = element.innerHTML.replace(new RegExp(item, "g"), `${value}`);
+        }
+
+        return;
+    };
+
+    const vm = virtualMachine || new VirtualMachine();
+    vm.initThis(refThis);
+
+    const sibling = element.nextElementSibling;
+    const parent = element.parentElement;
+
+    const [item, listName] = list.split(" in ");
+    const listValue = vm.runScriptSync(listName);
+
+    if (!Array.isArray(listValue)) throw new Error("i-for must have an array");
+
+    for (const value of listValue) {
+        const clone = element.cloneNode(true) as Element;
+        clone.removeAttribute("i-for");
+
+        clone.innerHTML = clone.innerHTML.replace(new RegExp(item, "g"), `${value}`);
+
+        clone.setAttribute("key", `${item}-${value}`);
+        clone.removeAttribute("data-uuid");
+
+        await putUuid(clone, refThis.refs);
+
+        refThis.appendElementToVirtualUnparsedMainNode(
+            clone,
+            (parent as HTMLElement).dataset.uuid,
+            (sibling as HTMLElement | null)?.dataset.uuid
+        );
+        
+        parent?.insertBefore(clone, sibling);
+    };
+
+    refThis.removeElementFromVirtualUnparsedMainNode(element.getAttribute("data-uuid") as string, refThis);
+
+    //remove element from refs associated elements
+    const elementUuid = (element as HTMLElement).dataset.uuid;
+
+    refThis.refs = refThis.refs.map((ref: Ref<any>) => {
+        elementUuid && ref.removeAssociatedElement(elementUuid);
+        return ref;
+    });
+
+    element.remove();
+
+}
+
+export const toggleHide = (condition: boolean, element: Element): void => {
+    if (condition) {
+        (element as HTMLElement).style.display = "none";
+    } else {
+        (element as HTMLElement).style.display = "";
+    }
+}
+
+export const parseConditionalRendering = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
+    const condition = element.getAttribute("i-if");
+    if (!condition) return;
+    
+    const vm = virtualMachine || new VirtualMachine();
+    vm.initThis(refThis);
+    
+    const sibling = element.nextElementSibling;
+    
+    if (!vm.runScriptSync(condition)) {
+        toggleHide(true, element);
+
+        if (sibling && sibling.hasAttribute("i-else")) {
+            toggleHide(false, sibling);
+        }
+
+        element.removeAttribute("i-if");
+
+        return;
+    }
+
+    toggleHide(false, element);
+
+    if (sibling?.hasAttribute("i-else")) {
+        toggleHide(true, sibling);
+    }
+
+    element.removeAttribute("i-if");
 }
 
 export const replaceBracesCode = (text: string, vm: VirtualMachine): string => {
@@ -97,7 +204,7 @@ export const parseCustomAttributes = async (element: Element, refThis: { [key: s
     }
 }
 
-const emitValue = (event: Event, modelName: string, modelValue: string, refs: Ref<any>[], refThis: { [key: string] : any }): void => {
+const emitValue = (event: Event, modelName: string, modelValue: string, refThis: { [key: string] : any }): void => {
     const element = event.target as HTMLInputElement;
 
     let inputValue: string | boolean = element.value;
@@ -124,11 +231,11 @@ const emitValue = (event: Event, modelName: string, modelValue: string, refs: Re
 
 
     if (Object.getOwnPropertyDescriptor(refThis, modelValue)) {
-        updateRef(modelValue, refs, refThis, value);
+        updateRef(modelValue, refThis, value);
     }
 }
 
-export const parseModelAttributes = async (element: Element, refs: Ref<any>[], refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
+export const parseModelAttributes = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
     const modelAttr = element.getAttributeNames().find(attr => attr === "i-model");
     if (modelAttr) {
         const modelValue = element.getAttribute(modelAttr);
@@ -143,18 +250,18 @@ export const parseModelAttributes = async (element: Element, refs: Ref<any>[], r
             element.setAttribute("value", `${evalutated}`);
 
             element.addEventListener("input", (e) => {
-                emitValue(e, modelAttr, modelValue, refs, refThis);
+                emitValue(e, modelAttr, modelValue, refThis);
             });
 
             element.addEventListener("change", (e) => {
-                emitValue(e, modelAttr, modelValue, refs, refThis);
+                emitValue(e, modelAttr, modelValue, refThis);
             });
         }
     }
 }
 
 export const parseComputedAttributes = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
-    const computedAttrs = element.getAttributeNames().filter(attr => attr.startsWith("#"));
+    const computedAttrs = element.getAttributeNames().filter(attr => attr.startsWith(":"));
 
     const vm = virtualMachine || new VirtualMachine();
     vm.initThis(refThis);
@@ -163,7 +270,7 @@ export const parseComputedAttributes = async (element: Element, refThis: { [key:
         const computed = element.getAttribute(attr);
         if (computed) {
             const computedValue = vm.runScriptSync(computed);
-            element.setAttribute(attr.replace("#", ""), `${computedValue}`);
+            element.setAttribute(attr.replace(":", ""), `${computedValue}`);
         }
         
         element.removeAttribute(attr);
@@ -187,12 +294,16 @@ export const parseComputedEvents = async (element: Element, refThis: { [key: str
     };
 }
 
-export const parseAll = async (element: Element, refs: Ref<any>[], refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
+export const parseAll = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
+    await parseConditionalRendering(element, refThis, virtualMachine);
+
+    await parseListRendering(element, refThis, virtualMachine);
+
     await parseCustomAttributes(element, refThis, virtualMachine);
 
     await parseComputedAttributes(element, refThis, virtualMachine);
 
-    await parseModelAttributes(element, refs, refThis, virtualMachine);
+    await parseModelAttributes(element, refThis, virtualMachine);
 
     await parseComputedEvents(element, refThis, virtualMachine);
 
@@ -200,7 +311,7 @@ export const parseAll = async (element: Element, refs: Ref<any>[], refThis: { [k
 
     for (let child of element.childNodes) {
         if (child.nodeType === 1) {
-            await parseAll(child as Element, refs, refThis, virtualMachine);
+            await parseAll(child as Element, refThis, virtualMachine);
         }
     };
 }

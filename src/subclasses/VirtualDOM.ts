@@ -1,8 +1,8 @@
 import {
     updateAttributesAndChildren,
     parseAll,
-    replaceBracesCode,
-    putUuid
+    putUuid,
+    forceReactivity,
 } from './../utils';
 import { InfimoObject } from '../types';
 import { DataProp, Listeners, PropType } from "../types";
@@ -31,12 +31,12 @@ export default class VirtualDOM {
         this.methods(infimoObject.methods || {});
     }
 
-    private notifyListeners<T>(dataRef: Ref<T>, newValue: T, oldValue?: T): void {
+    private async notifyListeners<T>(dataRef: Ref<T>, newValue: T, oldValue?: T): Promise<void> {
         if (this.listeners[dataRef.getName().name]) {
             this.listeners[dataRef.getName().name].forEach(listener => listener(newValue, oldValue));
         }
 
-        if(newValue !== oldValue) this.hydrate(dataRef);
+        if(newValue !== oldValue) await this.hydrate(dataRef);
     }
 
     private dataParse<T>(data: [string, T]): void {
@@ -50,10 +50,10 @@ export default class VirtualDOM {
         Object.defineProperties(this, {
             [name]: {
                 get: () => dataRef.getValue(),
-                set: (newValue: T) => {
+                set: async (newValue: T) => {
                     const oldValue = dataRef.getValue();
                     dataRef.setValue(newValue);
-                    this.notifyListeners(dataRef, newValue, oldValue);
+                    await this.notifyListeners(dataRef, newValue, oldValue);
                 }
             }
         });
@@ -119,7 +119,7 @@ export default class VirtualDOM {
 
             this.unparsedMainNode = element.cloneNode(true) as Element;
 
-            await parseAll(element, this.refs, this, vm);
+            await parseAll(element, this, vm);
 
             return element;
         }
@@ -127,39 +127,93 @@ export default class VirtualDOM {
         throw new Error("Invalid template");
     }
 
-    private hydrate(dataRef: Ref<any>): void {
+    appendElementToVirtualUnparsedMainNode(element: Element, parentUuid: string, referenceNodeAfterUuid: string): void {
+        const parent = this.unparsedMainNode.querySelector(`[data-uuid="${parentUuid}"]`);
+        const referenceNodeAfter = this.unparsedMainNode.querySelector(`[data-uuid="${referenceNodeAfterUuid}"]`);
+        if (parent && referenceNodeAfter) {
+            parent.insertBefore(element, referenceNodeAfter);
+            this.unparsedMainNode = this.unparsedMainNode.cloneNode(true) as Element;
+            
+            return;
+        }
+        
+        if (parent) {
+            parent.appendChild(element);
+            this.unparsedMainNode = this.unparsedMainNode.cloneNode(true) as Element;
+
+            return;
+        }
+    }
+
+    removeElementFromVirtualUnparsedMainNode(uuid: string): void {
+        const element = this.unparsedMainNode.querySelector(`[data-uuid="${uuid}"]`);
+
+        if (element) {
+            element.remove();
+            this.unparsedMainNode = this.unparsedMainNode.cloneNode(true) as Element;
+        }
+    }
+
+    private async hydrate(dataRef: Ref<any>): Promise<void> {
         const vm = new VirtualMachine();
         vm.initThis(this);
 
-        // Use dataRef.getAssociatedElementsUuid() to get all elements associated with the dataRef and update them
-        dataRef.getAssociatedElements().forEach(associatedElement => {
-            const virtualUnparsedElement = this.unparsedMainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
-            const virtualElement = this.mainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
+        const refThis = this;
 
+        let counter = 0;
+
+        let associatedElementsLength = dataRef.getAssociatedElements().length;
+
+        while (true) {
+            const updatedDataRef = this.refs.find(ref => ref.getName().name === dataRef.getName().name);
+            if (!updatedDataRef) break;
+            
+            associatedElementsLength = updatedDataRef.getAssociatedElements().length;
+            const associatedElement = updatedDataRef.getAssociatedElements()[counter];
+
+            let virtualUnparsedElement = this.unparsedMainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
+            let virtualElement = this.mainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
+            
             if (!virtualUnparsedElement || !virtualElement) return;
 
             for (let attr of associatedElement.inAttrNames) {
                 const computed = virtualUnparsedElement.getAttribute(attr);
                 if (computed) {
-                    const computedValue = vm.runScriptSync(computed);
-                    virtualElement.setAttribute(attr.replace(/#/, "").replace("@", "on"), `${computedValue}`);
+                    virtualElement.setAttribute(attr, computed);
+                    virtualElement = virtualElement.cloneNode(true) as Element;
+                }
+                
+
+                //update unparsed element if attr is missing
+                if (!virtualUnparsedElement.hasAttribute(attr)
+                    && virtualElement.hasAttribute(attr)
+                ) {
+                    const newComputed = virtualElement.getAttribute(attr);
+                    if(newComputed) {
+                        virtualUnparsedElement.setAttribute(attr, newComputed);
+                        virtualUnparsedElement = virtualUnparsedElement.cloneNode(true) as Element;
+                    } 
                 }
             }
-
+            
             if (associatedElement.inTextContent) {
                 const computed = virtualUnparsedElement.textContent;
                 if (computed) {
-                    const computedValue = replaceBracesCode(computed, vm);
-
-                    virtualElement.textContent = computedValue;
+                    virtualElement.textContent = computed;
                 }
             }
 
-            
+
+            await parseAll(virtualElement, refThis, vm);
+
+            virtualElement = virtualElement.cloneNode(true) as Element;
+
             const docElement = document.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
             docElement && updateAttributesAndChildren(virtualElement, docElement);
 
-        });
+            counter++;
+            if (counter === associatedElementsLength) break;
+        }
     }
 
     public async createMainNode(): Promise<void> {
@@ -169,6 +223,4 @@ export default class VirtualDOM {
     public getMainNode(): Element {
         return this.mainNode;
     }
-    
-
 }

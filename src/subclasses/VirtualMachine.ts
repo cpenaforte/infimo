@@ -23,7 +23,6 @@ export default class VirtualMachine {
         try {
             result = new vm.Script(script).runInNewContext(this.context);
         } catch (e) {
-            console.error(e);
         } finally {
             return result;
         }

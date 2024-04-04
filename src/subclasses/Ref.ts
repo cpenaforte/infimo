@@ -40,4 +40,8 @@ export default class Ref<T> {
             this.associatedElements.push(associatedElement);
         }
     }
+
+    removeAssociatedElement(uuid: string): void {
+        this.associatedElements = this.associatedElements.filter(associatedElement => associatedElement.uuid !== uuid);
+    }
 }

@@ -27,10 +27,14 @@ new Infimo.default({
     template: `
         <div>
             <h1>{{ message }}</h1>
-            <label for="inputValue">Type something</label>
-            <input id="inputValue" type="text" i-model="inputValue" />
-            <p #style="(inputValue === 'green' ? 'color: green;' : 'color: red;') + \`opacity:\${opacity};\`">{{ logText(inputValue) }}</p>
-            <button type="button" @click="blink">Blink</button>
+            <label for="input">Type something</label>
+            <input id="input" type="text" i-model="inputValue" />
+            <p :style="(inputValue === 'green' ? 'color: green;' : 'color: red;') + \`opacity:\${opacity};\`">{{ logText(inputValue) }}</p>
+            <button i-if="inputValue" type="button" @click="blink">Blink</button>
+            <button i-else type="button" @click="blink" disabled>Disabled</button>
+            <ul>
+                <li i-for="number in [1,2,3]">{{ number + this.inputValue }}</li>
+            </ul>
         </div>
     `
 }).build(this || {}, "#app");

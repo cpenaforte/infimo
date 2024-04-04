@@ -165,6 +165,8 @@ export const parseComputedAttributes = async (element: Element, refThis: { [key:
             const computedValue = vm.runScriptSync(computed);
             element.setAttribute(attr.replace("#", ""), `${computedValue}`);
         }
+        
+        element.removeAttribute(attr);
     };
 }
 
@@ -178,8 +180,10 @@ export const parseComputedEvents = async (element: Element, refThis: { [key: str
         const computed = element.getAttribute(attr);
         if (computed) {
             const computedValue = vm.runScriptSync(computed);
-            element.setAttribute(attr.replace("@", "on"), `${computedValue}`);
+            element.addEventListener(attr.replace("@", ""), computedValue);
         }
+
+        element.removeAttribute(attr);
     };
 }
 

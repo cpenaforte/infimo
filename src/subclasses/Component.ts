@@ -178,7 +178,21 @@ export default class Component {
             let virtualUnparsedElement = this.unparsedMainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
             let virtualElement = this.mainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
             
-            if (!virtualUnparsedElement || !virtualElement) return;
+            if (!virtualUnparsedElement || !virtualElement) {
+                if ((this.unparsedMainNode as HTMLElement).dataset.uuid === associatedElement.uuid) {
+                    virtualUnparsedElement = this.unparsedMainNode;
+                }
+
+                if ((this.mainNode as HTMLElement).dataset.uuid === associatedElement.uuid) {
+                    virtualElement = this.mainNode;
+                }
+
+                if (!virtualUnparsedElement || !virtualElement) {
+                    counter++;
+                    if (counter === associatedElementsLength) break;
+                    continue;
+                }
+            };
 
             for (let attr of associatedElement.inAttrNames) {
                 const computed = virtualUnparsedElement.getAttribute(attr);
@@ -194,7 +208,6 @@ export default class Component {
                     const newComputed = virtualElement.getAttribute(attr);
                     if(newComputed) {
                         virtualUnparsedElement.setAttribute(attr, newComputed);
-                        virtualUnparsedElement = virtualUnparsedElement.cloneNode(true) as Element;
                     } 
                 }
             }

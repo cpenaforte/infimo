@@ -357,7 +357,7 @@ export const updateAttributesAndChildren = (element: Element, docElement: Elemen
 
     element.childNodes.forEach(child => {
         if (child.nodeType === 1) {
-            const docChild = docElement.querySelector(`[data-uuid="${(child as Element).getAttribute("data-uuid")}"]`);
+            const docChild = docElement.querySelector(`[data-uuid="${(child as HTMLElement).dataset.uuid}"]`);
             if (docChild) {
                 updateAttributesAndChildren(child as Element, docChild);
             }

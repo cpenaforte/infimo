@@ -46,7 +46,7 @@ new Infimo.default({
     },
     template: `
         <div>
-            <h1>{{ message }}</h1>
+            <h1>{{ inputValue ? inputValue : message  }}</h1>
             <label for="input">Type something</label>
             <input id="input" type="text" i-model="inputValue" />
             <p :style="(inputValue === 'green' ? 'color: green;' : 'color: red;') + \`opacity:\${pOpacity};\`">{{ logText(inputValue) }}</p>

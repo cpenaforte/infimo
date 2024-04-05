@@ -124,6 +124,7 @@ export const parseListRendering = async (element: Element, refThis: { [key: stri
 }
 
 export const toggleHide = (condition: boolean, element: Element): void => {
+    console.log(condition, element);
     if (condition) {
         (element as HTMLElement).style.display = "none";
     } else {
@@ -323,8 +324,9 @@ export const parseComponents = async (element: Element, refThis: { [key: string]
     for (let component of components) {
         await component.createMainNode();
         const componentName = component.getName();
+        const templateTagName = `${componentName.toLocaleLowerCase()}-component`;
 
-        const componentElements = element.querySelectorAll(componentName);
+        const componentElements = element.querySelectorAll(templateTagName);
 
         for (let componentElement of componentElements) {
             componentElement.replaceWith(component.getMainNode());

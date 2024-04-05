@@ -105,8 +105,13 @@ export default class Component {
     }
 
     private async parseTemplate(templateStr: string): Promise<Element> {
+        let parsedTemplate = `${templateStr}`;
+        this.components.forEach(component => {
+            parsedTemplate = parsedTemplate.replace(new RegExp(`<${component.getName()}`, "g"), `<${component.getName().toLocaleLowerCase()}-component`);
+        });
+
         const step = document.createElement("div");
-        step.innerHTML = templateStr;
+        step.innerHTML = parsedTemplate;
         const element = step.firstElementChild;
 
         if (element) {
@@ -179,7 +184,6 @@ export default class Component {
                 const computed = virtualUnparsedElement.getAttribute(attr);
                 if (computed) {
                     virtualElement.setAttribute(attr, computed);
-                    virtualElement = virtualElement.cloneNode(true) as Element;
                 }
                 
 

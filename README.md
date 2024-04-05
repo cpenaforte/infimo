@@ -7,7 +7,7 @@ You can either import it via CDN or importing the NPM package.
 ### CDN
 Put the following script tag inside your html file.
 ```
-<script type="module" src="https://cdn.jsdelivr.net/npm/infimo/_bundles/infimo.min.js"></script>
+<script type="module" src="https://cdn.jsdelivr.net/npm/infimo@latest/_bundles/infimo.min.js"></script>
 ```
 
 The *type="module"* is necessary for importing it in your project's main JS file.

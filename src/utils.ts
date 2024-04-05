@@ -124,7 +124,6 @@ export const parseListRendering = async (element: Element, refThis: { [key: stri
 }
 
 export const toggleHide = (condition: boolean, element: Element): void => {
-    console.log(condition, element);
     if (condition) {
         (element as HTMLElement).style.display = "none";
     } else {

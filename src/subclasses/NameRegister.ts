@@ -31,11 +31,11 @@ export default class NameRegister {
         this.names.push(...names);
     }
 
-    nameExist(name: string): boolean {
+    public nameExist(name: string): boolean {
         return this.names.some(n => n.name === name);
     }
 
-    getNames(): RegisteredNames {
+    public getNames(): RegisteredNames {
         return this.names;
     }
 }

@@ -1,4 +1,5 @@
 import { InfimoObject } from "./types";
+import Component from "./subclasses/Component";
 
 import VirtualDOM from "./subclasses/VirtualDOM";
 
@@ -26,5 +27,7 @@ class InfimoFactory {
         Object.assign(appThis, this);
     }
 }
+
+export { Component };
 
 export default InfimoFactory;

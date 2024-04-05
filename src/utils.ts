@@ -1,3 +1,4 @@
+import Component from "./subclasses/Component";
 import Ref from "./subclasses/Ref";
 import VirtualMachine from "./subclasses/VirtualMachine";
 import { AssociatedElement } from "./types";
@@ -9,14 +10,18 @@ export const getPropertyValue = (property: string, refThis: {[key:string]: any})
     }
 }
 
+export const fullClone = (obj: object): object => {
+    return Object.getPrototypeOf(Object.create(obj));
+}
+
 export const updateRef = (refName: string, refThis: {[key:string]: any}, value: any): void => {
     refThis[refName] = value;
 
     refThis.refs.find((ref: Ref<any>) => ref.getName().name === refName)?.setValue(value);
 }
 
-export const associateElement = (element: Element, refs: Ref<any>[]): void => {
-    for (let ref of refs) {
+export const associateElement = (element: Element, refThis: {[key:string]: any}): void => {
+    for (let ref of refThis.refs) {
         // verify if ref is contained in the match and put uuid into associatedElementsUuid
         const associatedElement: AssociatedElement = {
             uuid: element.getAttribute("data-uuid") as string,
@@ -44,17 +49,17 @@ export const associateElement = (element: Element, refs: Ref<any>[]): void => {
     }
 }
 
-export const putUuid = async (element: Element, refs: Ref<any>[]): Promise<void> => {
+export const putUuid = async (element: Element, refThis: { [key: string] : any }): Promise<void> => {
     if (!element.hasAttribute("data-uuid")) {
         const uuid = Math.random().toString(36).substring(7);
         element.setAttribute("data-uuid", uuid);
     
-        associateElement(element, refs);
+        associateElement(element, refThis);
     }
 
     for (let child of element.childNodes) {
         if (child.nodeType === 1) {
-            await putUuid(child as Element, refs);
+            await putUuid(child as Element, refThis);
         }
     };
 }
@@ -93,7 +98,7 @@ export const parseListRendering = async (element: Element, refThis: { [key: stri
         clone.setAttribute("key", `${item}-${value}`);
         clone.removeAttribute("data-uuid");
 
-        await putUuid(clone, refThis.refs);
+        await putUuid(clone, refThis);
 
         refThis.appendElementToVirtualUnparsedMainNode(
             clone,
@@ -276,7 +281,7 @@ export const parseComputedAttributes = async (element: Element, refThis: { [key:
 export const parseComputedEvents = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
     const computedEvents = element.getAttributeNames().filter(attr => attr.startsWith("@"));
 
-    const vm = virtualMachine || new VirtualMachine();;
+    const vm = virtualMachine || new VirtualMachine();
     vm.initThis(refThis);
 
     for (let attr of computedEvents) {
@@ -310,6 +315,21 @@ export const parseAll = async (element: Element, refThis: { [key: string] : any 
             await parseAll(child as Element, refThis, virtualMachine);
         }
     };
+}
+
+export const parseComponents = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
+    const components = refThis.components as Component[];
+
+    for (let component of components) {
+        await component.createMainNode();
+        const componentName = component.getName();
+
+        const componentElements = element.querySelectorAll(componentName);
+
+        for (let componentElement of componentElements) {
+            componentElement.replaceWith(component.getMainNode());
+        }
+    }
 }
 
 

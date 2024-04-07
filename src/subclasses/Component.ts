@@ -57,6 +57,12 @@ export default class Component {
     setProps(propsToSet: { [key: string]: any}): void {
         const refThis = this;
 
+        const checkType = (value: any, type: TypeConstructor) => {
+            if (value === null) return false;
+
+            return type(value) === value;
+        }
+
         Object.entries(propsToSet).forEach(([name, value]) => {
             // get prop definition in componentProps, validate the type and, if is valid, use defineProperty to set the value
             // parse name, substituting kebab-case for camelCase
@@ -68,7 +74,7 @@ export default class Component {
             }
 
             if (Array.isArray(propDefinition)) {
-                if (!propDefinition.some((type: TypeConstructor) => (type(value) === value) )) {
+                if (!propDefinition.some((type: TypeConstructor) => (checkType(value, type)) )) {
                     throw new Error(`Prop ${parsedName} must be one of ${propDefinition}`);
                 }
             } else if (typeof propDefinition === "object") {
@@ -79,7 +85,7 @@ export default class Component {
                     value = propDefinition.default;
                 }
                 if (Array.isArray(propDefinition.type)) {
-                    if (!propDefinition.type.some((type: TypeConstructor) => type(value) === value)) {
+                    if (!propDefinition.type.some((type: TypeConstructor) => checkType(value, type))) {
                         throw new Error(`Prop ${parsedName} must be one of ${propDefinition.type}`);
                     }
                 } else {
@@ -87,7 +93,7 @@ export default class Component {
                         (propDefinition.type === null && value === null)
                             || (
                                 propDefinition.type !== null
-                                    && (propDefinition.type(value) === value)
+                                    && (checkType(value, propDefinition.type))
                             )
                     )) {
                         throw new Error(`Prop ${parsedName} must be ${propDefinition.type}`);
@@ -99,7 +105,7 @@ export default class Component {
                     }
                 }
             } else {
-                if (!(propDefinition(value) === value)) {
+                if (!(checkType(value, propDefinition))) {
                     throw new Error(`Prop ${parsedName} must be ${propDefinition}`);
                 }
             }

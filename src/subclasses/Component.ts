@@ -1,4 +1,4 @@
-import { DataProp, InfimoObject, Listeners, MethodsProp, PropType, WatchProp } from "../types";
+import { DataProp, InfimoObject, Listeners, MethodsProp, Prop, PropType, PropsProp, TypeConstructor, WatchProp } from "../types";
 import { parseAll, parseComponents, putUuid, updateAttributesAndChildren } from "../utils";
 import NameRegister from "./NameRegister";
 import Ref from "./Ref";
@@ -11,6 +11,7 @@ export default class Component {
     private mainNode: Element;
     private listeners: Listeners;
     private refs: Ref<any>[];
+    private componentProps : PropsProp;
     private namesRegister: NameRegister;
     private components: Component[];
 
@@ -22,11 +23,90 @@ export default class Component {
         this.components = infimoObject.components || [];
         this.listeners = {};
         this.refs = [];
+        this.componentProps = {};
         this.namesRegister = new NameRegister();
 
+        this.props(infimoObject.props || {});
         this.data(infimoObject.data || {});
         this.watch(infimoObject.watch || {});
         this.methods(infimoObject.methods || {});
+    }
+
+    private propsParse<T>(prop: [string, Prop<T>]): void {
+        const [name, value] = prop;
+
+        const registeredName = this.namesRegister.registerName(name, PropType.PROPS);
+
+        this.componentProps[registeredName.name] = value;
+    }
+
+    private props(propsProp: PropsProp): void {
+        Object.entries(propsProp).forEach(prop => this.propsParse(prop));
+    }
+
+    setProps(propsToSet: { [key: string]: any}): void {
+        const refThis = this;
+
+        Object.entries(propsToSet).forEach(([name, value]) => {
+            // get prop definition in componentProps, validate the type and, if is valid, use defineProperty to set the value
+            // parse name, substituting kebab-case for camelCase
+            const parsedName = name.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+            const propDefinition: Prop<any> = this.componentProps[parsedName];
+
+            if (!propDefinition) {
+                throw new Error(`Prop ${parsedName} does not exist`);
+            }
+
+            if (Array.isArray(propDefinition)) {
+                if (!propDefinition.some((type: TypeConstructor) => (type(value) === value) )) {
+                    throw new Error(`Prop ${parsedName} must be one of ${propDefinition}`);
+                }
+            } else if (typeof propDefinition === "object") {
+                if (propDefinition.required && !value) {
+                    throw new Error(`Prop ${parsedName} is required`);
+                }
+                if (value === (undefined || null)) {
+                    value = propDefinition.default;
+                }
+                if (Array.isArray(propDefinition.type)) {
+                    if (!propDefinition.type.some((type: TypeConstructor) => type(value) === value)) {
+                        throw new Error(`Prop ${parsedName} must be one of ${propDefinition.type}`);
+                    }
+                } else {
+                    if (!(
+                        (propDefinition.type === null && value === null)
+                            || (
+                                propDefinition.type !== null
+                                    && (propDefinition.type(value) === value)
+                            )
+                    )) {
+                        throw new Error(`Prop ${parsedName} must be ${propDefinition.type}`);
+                    }
+                }
+                if (propDefinition.validator) {
+                    if (!propDefinition.validator(value)) {
+                        throw new Error(propDefinition.validatorMessage || `Prop ${parsedName} is invalid`);
+                    }
+                }
+            } else {
+                if (!(propDefinition(value) === value)) {
+                    throw new Error(`Prop ${parsedName} must be ${propDefinition}`);
+                }
+            }
+
+            // get registered name, create a new Ref and push it to refs. Also, create a getter for the prop
+            const registeredName = this.namesRegister.getNames().find(registeredName => registeredName.name === parsedName && registeredName.type === PropType.PROPS);
+            if (!registeredName) {
+                throw new Error(`Prop ${parsedName} does not exist`);
+            }
+
+            const propRef = new Ref(registeredName, value);
+            this.refs.push(propRef);
+
+            Object.defineProperty(refThis, registeredName.name, {
+                get: () => propRef.getValue()
+            });
+        });
     }
 
     private async notifyListeners<T>(dataRef: Ref<T>, newValue: T, oldValue?: T): Promise<void> {
@@ -122,8 +202,8 @@ export default class Component {
 
             this.unparsedMainNode = element.cloneNode(true) as Element;
 
-            await parseAll(element, this, vm);
             await parseComponents(element, this, vm);
+            await parseAll(element, this, vm);
 
             return element;
         }
@@ -220,8 +300,8 @@ export default class Component {
             }
 
 
-            await parseAll(virtualElement, refThis, vm);
             await parseComponents(virtualElement, refThis, vm);
+            await parseAll(virtualElement, refThis, vm);
 
             virtualElement = virtualElement.cloneNode(true) as Element;
 

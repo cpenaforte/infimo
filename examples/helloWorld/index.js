@@ -1,15 +1,27 @@
 const Button = new Infimo.Component({
     name: "Button",
+    props: {
+        btnText: {
+            type: String,
+            default: "Button text"
+        },
+        btnType: {
+            type: String,
+            default: "button"
+        },
+    },
     data: {
         message: "Click me!"
     },
     methods: {
         onClick() {
             console.log("Button clicked!");
+
+            console.log(this.btnText);
         }
     },
     template: `
-        <button type="button" @click="onClick">{{ message }}</button>
+        <button :type="btnType" @click="onClick">{{ btnText }}</button>
     `,
 });
 
@@ -55,7 +67,7 @@ new Infimo.default({
             <ul>
                 <li i-for="number in [1,2,3]">{{ number + inputValue }}</li>
             </ul>
-            <Button></Button>
+            <Button :btn-text="inputValue"></Button>
         </div>
     `
 }).build(this || {}, "#app");

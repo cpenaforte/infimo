@@ -171,7 +171,7 @@ export const replaceBracesCode = (text: string, vm: VirtualMachine): string => {
 export const parseBracesCode = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
     const vm = virtualMachine || new VirtualMachine();
     vm.initThis(refThis);
-
+    
     for( let child of element.childNodes) {
         if (child.nodeType === 3) {
             const text = (child as Element).textContent;
@@ -321,14 +321,41 @@ export const parseComponents = async (element: Element, refThis: { [key: string]
     const components = refThis.components as Component[];
 
     for (let component of components) {
-        await component.createMainNode();
         const componentName = component.getName();
         const templateTagName = `${componentName.toLocaleLowerCase()}-component`;
 
         const componentElements = element.querySelectorAll(templateTagName);
 
+        const vm = virtualMachine || new VirtualMachine();
+        vm.initThis(refThis);
+
+        // find props, validate them and pass them to the component
         for (let componentElement of componentElements) {
-            componentElement.replaceWith(component.getMainNode());
+            const props = componentElement.getAttributeNames().filter(attr => !attr.startsWith("@") && !attr.startsWith("i-") && (attr !== "data-uuid"));
+
+            let parsedProps: { [key: string]: any } = {};
+
+            for (let prop of props) {
+                const propValue = componentElement.getAttribute(prop);
+
+                if (prop.startsWith(":")) {
+                    const propName = prop.replace(":", "");
+                    const propValueEvaluated = vm.runScriptSync(propValue || "true");
+                    parsedProps[propName] = propValueEvaluated;
+                } else {
+                    parsedProps[prop] = propValue || true;
+                }
+
+                componentElement.removeAttribute(prop);
+            }
+
+            component.setProps(parsedProps);
+            await component.createMainNode();
+
+            const componentNode = component.getMainNode();
+            console.log("componentNode", componentNode);
+
+            componentElement.replaceWith(componentNode);
         }
     }
 }

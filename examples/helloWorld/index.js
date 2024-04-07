@@ -67,7 +67,7 @@ new Infimo.default({
             <ul>
                 <li i-for="number in [1,2,3]">{{ number + inputValue }}</li>
             </ul>
-            <Button :btn-text="inputValue"></Button>
+            <Button :btn-text="inputValue" :btn-type="inputValue"></Button>
         </div>
     `
 }).build(this || {}, "#app");

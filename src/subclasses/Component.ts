@@ -38,6 +38,16 @@ export default class Component {
         const registeredName = this.namesRegister.registerName(name, PropType.PROPS);
 
         this.componentProps[registeredName.name] = value;
+
+        //if prop has default value, set it
+        if (typeof value === "object" && !Array.isArray(value) && value?.default) {
+            const propRef = new Ref(registeredName, value.default);
+            this.refs.push(propRef);
+
+            Object.defineProperty(this, registeredName.name, {
+                get: () => propRef.getValue()
+            });
+        }
     }
 
     private props(propsProp: PropsProp): void {
@@ -51,7 +61,7 @@ export default class Component {
             // get prop definition in componentProps, validate the type and, if is valid, use defineProperty to set the value
             // parse name, substituting kebab-case for camelCase
             const parsedName = name.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
-            const propDefinition: Prop<any> = this.componentProps[parsedName];
+            const propDefinition: Prop<any> = refThis.componentProps[parsedName];
 
             if (!propDefinition) {
                 throw new Error(`Prop ${parsedName} does not exist`);
@@ -95,13 +105,21 @@ export default class Component {
             }
 
             // get registered name, create a new Ref and push it to refs. Also, create a getter for the prop
-            const registeredName = this.namesRegister.getNames().find(registeredName => registeredName.name === parsedName && registeredName.type === PropType.PROPS);
+            const registeredName = refThis.namesRegister.getNames().find(registeredName => registeredName.name === parsedName && registeredName.type === PropType.PROPS);
             if (!registeredName) {
                 throw new Error(`Prop ${parsedName} does not exist`);
             }
 
+            // check if ref exist, if it does, update the value
+            const ref = refThis.refs.find(ref => ref.getName().name === registeredName.name);
+            if (ref) {
+                ref.setValue(value);
+
+                return;
+            }
+
             const propRef = new Ref(registeredName, value);
-            this.refs.push(propRef);
+            refThis.refs.push(propRef);
 
             Object.defineProperty(refThis, registeredName.name, {
                 get: () => propRef.getValue()
@@ -257,7 +275,7 @@ export default class Component {
 
             let virtualUnparsedElement = this.unparsedMainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
             let virtualElement = this.mainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
-            
+
             if (!virtualUnparsedElement || !virtualElement) {
                 if ((this.unparsedMainNode as HTMLElement).dataset.uuid === associatedElement.uuid) {
                     virtualUnparsedElement = this.unparsedMainNode;
@@ -274,35 +292,52 @@ export default class Component {
                 }
             };
 
-            for (let attr of associatedElement.inAttrNames) {
-                const computed = virtualUnparsedElement.getAttribute(attr);
-                if (computed) {
-                    virtualElement.setAttribute(attr, computed);
-                }
-                
+            if (virtualUnparsedElement?.tagName !== virtualElement?.tagName
+                && virtualUnparsedElement?.tagName.toLowerCase().includes("-component")
+            ) {
+                // set virtualElement equal to virtualUnparsedElement
+                virtualElement.replaceWith(virtualUnparsedElement.cloneNode(true) as Element);
+                virtualElement = this.mainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
 
-                //update unparsed element if attr is missing
-                if (!virtualUnparsedElement.hasAttribute(attr)
-                    && virtualElement.hasAttribute(attr)
-                ) {
-                    const newComputed = virtualElement.getAttribute(attr);
-                    if(newComputed) {
-                        virtualUnparsedElement.setAttribute(attr, newComputed);
-                    } 
+                if ((this.mainNode as HTMLElement).dataset.uuid === associatedElement.uuid) {
+                    virtualElement = this.mainNode;
+                }
+
+                if (!virtualElement) {
+                    counter++;
+                    if (counter === associatedElementsLength) break;
+                    continue;
+                }
+            } else {
+                for (let attr of associatedElement.inAttrNames) {
+                    const computed = virtualUnparsedElement.getAttribute(attr);
+                    if (computed) {
+                        virtualElement.setAttribute(attr, computed);
+                    }
+                    
+    
+                    //update unparsed element if attr is missing
+                    if (!virtualUnparsedElement.hasAttribute(attr)
+                        && virtualElement.hasAttribute(attr)
+                    ) {
+                        const newComputed = virtualElement.getAttribute(attr);
+                        if(newComputed) {
+                            virtualUnparsedElement.setAttribute(attr, newComputed);
+                        } 
+                    }
+                }
+
+                if (associatedElement.inTextContent) {
+                    const computed = virtualUnparsedElement.textContent;
+                    if (computed) {
+                        virtualElement.textContent = computed;
+                    }
                 }
             }
-            
-            if (associatedElement.inTextContent) {
-                const computed = virtualUnparsedElement.textContent;
-                if (computed) {
-                    virtualElement.textContent = computed;
-                }
-            }
-
 
             await parseComponents(virtualElement, refThis, vm);
             await parseAll(virtualElement, refThis, vm);
-
+            
             virtualElement = virtualElement.cloneNode(true) as Element;
 
             const docElement = document.querySelector(`[data-uuid="${associatedElement.uuid}"]`);

@@ -317,6 +317,39 @@ export const parseAll = async (element: Element, refThis: { [key: string] : any 
     };
 }
 
+export const parseSingleComponent = async (component: Component, componentElement: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
+    const vm = virtualMachine || new VirtualMachine();
+    vm.initThis(refThis);
+
+    const props = componentElement.getAttributeNames().filter(attr => !attr.startsWith("@") && !attr.startsWith("i-") && (attr !== "data-uuid"));
+
+    let parsedProps: { [key: string]: any } = {};
+
+    for (let prop of props) {
+        const propValue = componentElement.getAttribute(prop);
+
+        if (prop.startsWith(":")) {
+            const propName = prop.replace(":", "");
+            const propValueEvaluated = vm.runScriptSync(propValue || "true");
+            parsedProps[propName] = propValueEvaluated;
+        } else {
+            parsedProps[prop] = propValue || true;
+        }
+
+        componentElement.removeAttribute(prop);
+    }
+
+    component.setProps(parsedProps);
+    await component.createMainNode();
+
+    const componentNode = component.getMainNode();
+    componentNode.setAttribute("data-uuid", (componentElement as HTMLElement).dataset.uuid || (componentElement.getAttribute("data-uuid") as string));
+    componentNode.setAttribute("data-component", component.getName());
+
+    componentElement.replaceWith(componentNode);
+}
+
+
 export const parseComponents = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
     const components = refThis.components as Component[];
 
@@ -329,33 +362,14 @@ export const parseComponents = async (element: Element, refThis: { [key: string]
         const vm = virtualMachine || new VirtualMachine();
         vm.initThis(refThis);
 
+        
         // find props, validate them and pass them to the component
         for (let componentElement of componentElements) {
-            const props = componentElement.getAttributeNames().filter(attr => !attr.startsWith("@") && !attr.startsWith("i-") && (attr !== "data-uuid"));
-
-            let parsedProps: { [key: string]: any } = {};
-
-            for (let prop of props) {
-                const propValue = componentElement.getAttribute(prop);
-
-                if (prop.startsWith(":")) {
-                    const propName = prop.replace(":", "");
-                    const propValueEvaluated = vm.runScriptSync(propValue || "true");
-                    parsedProps[propName] = propValueEvaluated;
-                } else {
-                    parsedProps[prop] = propValue || true;
-                }
-
-                componentElement.removeAttribute(prop);
-            }
-
-            component.setProps(parsedProps);
-            await component.createMainNode();
-
-            const componentNode = component.getMainNode();
-            console.log("componentNode", componentNode);
-
-            componentElement.replaceWith(componentNode);
+            parseSingleComponent(component, componentElement as Element, refThis, vm);
+        }
+        
+        if (element.tagName.toLocaleLowerCase() === templateTagName) {
+            parseSingleComponent(component, element, refThis, vm);
         }
     }
 }

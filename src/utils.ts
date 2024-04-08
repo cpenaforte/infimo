@@ -337,6 +337,8 @@ export const parseSingleComponent = async (component: Component, componentElemen
     const vm = virtualMachine || new VirtualMachine();
     vm.initThis(refThis);
 
+    // Parse component props
+
     const props = componentElement.getAttributeNames().filter(attr => !attr.startsWith("@") && !attr.startsWith("i-") && (attr !== "data-uuid"));
 
     let parsedProps: { [key: string]: any } = {};
@@ -356,6 +358,25 @@ export const parseSingleComponent = async (component: Component, componentElemen
     }
 
     component.setProps(parsedProps);
+
+    // Parse component events
+
+    const events = componentElement.getAttributeNames().filter(attr => attr.startsWith("@"));
+
+    for (let event of events) {
+        const eventValue = componentElement.getAttribute(event);
+        if (!eventValue) continue;
+
+        const eventName = event.replace("@", "");
+        const eventFunction = vm.runScriptSync(eventValue);
+
+        const uuid = (componentElement as HTMLElement).dataset.uuid || (componentElement.getAttribute("data-uuid")) || component.getName();
+
+        refThis.eventBus.on(eventName, eventFunction, uuid);
+
+        componentElement.removeAttribute(event);
+    }
+
     await component.createMainNode();
 
     const componentNode = component.getMainNode();

@@ -1,5 +1,6 @@
 import { DataProp, InfimoObject, Listeners, MethodsProp, Prop, PropType, PropsProp, TypeConstructor, WatchProp } from "../types";
 import { parseAll, parseComponents, putUuid, updateAttributesAndChildren } from "../utils";
+import EventBus from "./EventBus";
 import NameRegister from "./NameRegister";
 import Ref from "./Ref";
 import VirtualMachine from "./VirtualMachine";
@@ -14,8 +15,9 @@ export default class Component {
     private componentProps : PropsProp;
     private namesRegister: NameRegister;
     private components: Component[];
+    private eventBus: EventBus;
 
-    constructor(infimoObject: InfimoObject) {
+    constructor(infimoObject: InfimoObject, eventBus: EventBus) {
         this.name = infimoObject.name;
         this.unparsedMainNode = document.createElement("div");
         this.mainNode = document.createElement("div");
@@ -25,11 +27,18 @@ export default class Component {
         this.refs = [];
         this.componentProps = {};
         this.namesRegister = new NameRegister();
+        this.eventBus = eventBus;
 
         this.props(infimoObject.props || {});
         this.data(infimoObject.data || {});
         this.watch(infimoObject.watch || {});
         this.methods(infimoObject.methods || {});
+    }
+
+    emit(event: string, ...args: any[]): void {
+        const uuid = (this.mainNode as HTMLElement).dataset.uuid || this.mainNode.getAttribute("data-uuid") || this.name;
+        
+        this.eventBus.emit(event, uuid, ...args);
     }
 
     private propsParse<T>(prop: [string, Prop<T>]): void {

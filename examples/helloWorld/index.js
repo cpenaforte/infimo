@@ -1,4 +1,4 @@
-const Button = new Infimo.Component({
+const Button = Infimo.default.defineComponent({
     name: "Button",
     props: {
         btnText: {
@@ -15,13 +15,11 @@ const Button = new Infimo.Component({
     },
     methods: {
         onClick() {
-            console.log("Button clicked!");
-
-            console.log(this.btnText);
+            this.emit("showClick", this.btnText);
         }
     },
     template: `
-        <button :type="btnType" @click="onClick">{{ btnText }}</button>
+        <button type="button" @click="onClick">button: {{ btnText }}</button>
     `,
 });
 
@@ -54,6 +52,9 @@ new Infimo.default({
             setTimeout(() => {
                 this.pOpacity = 1;
             }, 1000);
+        },
+        clickedButton(arg) {
+            console.log("Button clicked! "+arg);
         }
     },
     template: `
@@ -70,7 +71,7 @@ new Infimo.default({
             <ul>
                 <li i-for="number in ['aba2','a23sd','as22dc']">{{ number + inputValue }}</li>
             </ul>
-            <Button :btn-text="inputValue" :btn-type="inputValue"></Button>
+            <Button :btn-text="inputValue" :btn-type="inputValue" @showClick="clickedButton"></Button>
         </div>
     `
 }).build(this || {}, "#app");

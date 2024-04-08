@@ -1,8 +1,9 @@
 import { DataProp, InfimoObject, Listeners, MethodsProp, Prop, PropType, PropsProp, TypeConstructor, WatchProp } from "../types";
-import { parseAll, parseComponents, putUuid, updateAttributesAndChildren } from "../utils";
+import { parseDataInsertion, parseStructures, parseComponents, putUuid, updateAttributesAndChildren, fullClone } from "../utils";
 import EventBus from "./EventBus";
 import NameRegister from "./NameRegister";
 import Ref from "./Ref";
+import RemovedElements from "./RemovedElements";
 import VirtualMachine from "./VirtualMachine";
 
 export default class Component {
@@ -16,6 +17,7 @@ export default class Component {
     private namesRegister: NameRegister;
     private components: Component[];
     private eventBus: EventBus;
+    private removedElements: RemovedElements;
 
     constructor(infimoObject: InfimoObject, eventBus: EventBus) {
         this.name = infimoObject.name;
@@ -28,6 +30,7 @@ export default class Component {
         this.componentProps = {};
         this.namesRegister = new NameRegister();
         this.eventBus = eventBus;
+        this.removedElements = new RemovedElements();
 
         this.props(infimoObject.props || {});
         this.data(infimoObject.data || {});
@@ -235,8 +238,9 @@ export default class Component {
 
             this.unparsedMainNode = element.cloneNode(true) as Element;
 
+            await parseStructures(element, this, vm);
             await parseComponents(element, this, vm);
-            await parseAll(element, this, vm);
+            await parseDataInsertion(element, this, vm);
 
             return element;
         }
@@ -300,6 +304,35 @@ export default class Component {
                     virtualElement = this.mainNode;
                 }
 
+                if (!virtualElement && virtualUnparsedElement) {
+                    if (virtualUnparsedElement.hasAttribute("i-if") || virtualUnparsedElement.hasAttribute("i-else")) {
+                        const removed = refThis.removedElements.getRemovedElement(associatedElement.uuid);
+                        console.log(virtualUnparsedElement, removed);
+                        if (removed) {
+                            const parsedParent = (this.mainNode as HTMLElement).dataset.uuid === (removed.parent as HTMLElement | null)?.dataset.uuid
+                                ? this.mainNode
+                                : this.mainNode.querySelector(`[data-uuid="${(removed.parent as HTMLElement | null)?.dataset.uuid || ""}"]`);
+                            const parsedSibling = removed.nextSibling
+                                ? parsedParent?.querySelector(`[data-uuid="${removed.nextSibling.getAttribute("data-uuid")}"]`) ?? null
+                                : null;
+
+                            console.log(parsedParent, parsedSibling);
+                            
+                            if (parsedSibling && parsedSibling.parentElement === parsedParent) {
+                                parsedParent?.insertBefore(fullClone(virtualUnparsedElement) as Element, parsedSibling);
+                            } else if (parsedParent) {
+                                parsedParent.appendChild(fullClone(virtualUnparsedElement) as Element);
+                            } else {
+                                document.body.insertBefore(fullClone(virtualUnparsedElement) as Element, parsedSibling);
+                            }
+
+                            this.removedElements.pop(associatedElement.uuid);
+
+                            virtualElement = refThis.mainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
+                        }
+                    }
+                }
+
                 if (!virtualUnparsedElement || !virtualElement) {
                     counter++;
                     if (counter === associatedElementsLength) break;
@@ -350,8 +383,9 @@ export default class Component {
                 }
             }
 
+            await parseStructures(virtualElement, refThis, vm);
             await parseComponents(virtualElement, refThis, vm);
-            await parseAll(virtualElement, refThis, vm);
+            await parseDataInsertion(virtualElement, refThis, vm);
             
             virtualElement = virtualElement.cloneNode(true) as Element;
 

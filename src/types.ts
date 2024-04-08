@@ -40,7 +40,7 @@ export const enum PropType {
     DATA = "data",
     WATCH = "watch",
     METHODS = "methods"
-}
+};
 
 export type RegisteredName = {name: string, type: PropType};
 
@@ -52,4 +52,10 @@ export type AssociatedElement = {
     uuid: string,
     inTextContent: boolean,
     inAttrNames: string[],
-}
+};
+
+export type RemovedElement = {
+    el: Element,
+    parent: Element | null,
+    nextSibling: Element | null
+};

@@ -47,6 +47,22 @@ export const associateElement = (element: Element, refThis: {[key:string]: any})
             ref.addAssociatedElement(associatedElement);
         }
     }
+
+    const previousSibling = element.previousElementSibling;
+
+    if (previousSibling?.hasAttribute("i-if") && element.hasAttribute("i-else")) {
+        const previousSiblingUuid = previousSibling.getAttribute("data-uuid") || (previousSibling as HTMLElement).dataset.uuid;
+
+        for (let ref of refThis.refs) {
+            if (ref.getAssociatedElements().find((el: AssociatedElement) => el.uuid === previousSiblingUuid)) {
+                ref.addAssociatedElement({
+                    uuid: element.getAttribute("data-uuid") || (element as HTMLElement).dataset.uuid,
+                    inTextContent: false,
+                    inAttrNames: ["i-else"]
+                });
+            }
+        }
+    }
 }
 
 export const putUuid = async (element: Element, refThis: { [key: string] : any }): Promise<void> => {
@@ -83,12 +99,11 @@ export const parseListRendering = async (element: Element, refThis: { [key: stri
 
     for (const value of listValue) {
         const clone = element.cloneNode(true) as Element;
+
         clone.removeAttribute("i-for");
-        
         clone.removeAttribute("data-uuid");
         
         await putUuid(clone, refThis);
-
         const cloneUuid = (clone as HTMLElement).dataset.uuid as string;
         
         Object.assign(refThis, {
@@ -101,6 +116,7 @@ export const parseListRendering = async (element: Element, refThis: { [key: stri
             } 
         });
 
+        // Append list elements to unparsed dom
         refThis.appendElementToVirtualUnparsedMainNode(
             clone,
             (parent as HTMLElement).dataset.uuid,
@@ -110,9 +126,10 @@ export const parseListRendering = async (element: Element, refThis: { [key: stri
         parent?.insertBefore(clone, sibling);
     };
 
+    // Remove original element
     refThis.removeElementFromVirtualUnparsedMainNode(element.getAttribute("data-uuid") as string, refThis);
 
-    //remove element from refs associated elements
+    // Remove element from refs associated elements
     const elementUuid = (element as HTMLElement).dataset.uuid;
 
     refThis.refs = refThis.refs.map((ref: Ref<any>) => {
@@ -121,19 +138,21 @@ export const parseListRendering = async (element: Element, refThis: { [key: stri
     });
 
     element.remove();
-
 }
 
 export const parseForVariables = (element: Element, refThis: { [key: string] : any }): object => {
     return Object.assign(fullClone(refThis), ((refThis?.forVariables || {})[(element as HTMLElement).dataset.uuid as string] || {}));
 }
 
-export const toggleHide = (condition: boolean, element: Element): void => {
+export const removeElement = (condition: boolean, element: Element, refThis: {[key: string]: any}): void => {
     if (condition) {
-        (element as HTMLElement).style.display = "none";
-    } else {
-        (element as HTMLElement).style.display = "";
+        refThis.removedElements?.add(element);
+
+        element.remove();
+        return;
     }
+
+    refThis.removedElements?.pop((element as HTMLElement).dataset.uuid as string);
 }
 
 export const parseConditionalRendering = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
@@ -146,26 +165,22 @@ export const parseConditionalRendering = async (element: Element, refThis: { [ke
     vm.initThis(parsedThis);
     
     const sibling = element.nextElementSibling;
-    
+
     if (!vm.runScriptSync(condition)) {
-        toggleHide(true, element);
+        removeElement(true, element, refThis);
 
         if (sibling && sibling.hasAttribute("i-else")) {
-            toggleHide(false, sibling);
+            removeElement(false, sibling, refThis);
         }
-
-        element.removeAttribute("i-if");
 
         return;
     }
 
-    toggleHide(false, element);
+    removeElement(false, element, refThis);
 
     if (sibling?.hasAttribute("i-else")) {
-        toggleHide(true, sibling);
+        removeElement(true, sibling, refThis);
     }
-
-    element.removeAttribute("i-if");
 }
 
 export const replaceBracesCode = (text: string, vm: VirtualMachine): string => {
@@ -311,11 +326,18 @@ export const parseComputedEvents = async (element: Element, refThis: { [key: str
     };
 }
 
-export const parseAll = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
+export const parseStructures = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
     await parseConditionalRendering(element, refThis, virtualMachine);
-
     await parseListRendering(element, refThis, virtualMachine);
 
+    for (let child of element.childNodes) {
+        if (child.nodeType === 1) {
+            await parseStructures(child as Element, refThis, virtualMachine);
+        }
+    };
+}
+
+export const parseDataInsertion = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
     await parseCustomAttributes(element, refThis, virtualMachine);
 
     await parseComputedAttributes(element, refThis, virtualMachine);
@@ -328,7 +350,7 @@ export const parseAll = async (element: Element, refThis: { [key: string] : any 
 
     for (let child of element.childNodes) {
         if (child.nodeType === 1) {
-            await parseAll(child as Element, refThis, virtualMachine);
+            await parseDataInsertion(child as Element, refThis, virtualMachine);
         }
     };
 }

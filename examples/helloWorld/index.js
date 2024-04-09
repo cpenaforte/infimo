@@ -41,8 +41,6 @@ new Infimo.default({
     },
     methods: {
         logText(text) {
-            console.log(text);
-
             return text;
         },
         blink() {

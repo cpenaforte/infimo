@@ -8,6 +8,10 @@ export default class RemovedElements {
     }
 
     add(element: Element): void {
+        if (this.removedElements.some(removedElement => removedElement.el.getAttribute("data-uuid") === element.getAttribute("data-uuid"))) {
+            return;
+        }
+
         this.removedElements.push({
             el: element,
             parent: element.parentElement,

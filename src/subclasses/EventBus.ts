@@ -9,6 +9,10 @@ export default class EventBus {
             this.listeners[parsedEventName] = [];
         }
 
+        if (this.listeners[parsedEventName].includes(callback)) {
+            return;
+        }
+
         this.listeners[parsedEventName].push(callback);
     }
 

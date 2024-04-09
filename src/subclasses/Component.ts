@@ -53,8 +53,12 @@ export default class Component {
 
         //if prop has default value, set it
         if (typeof value === "object" && !Array.isArray(value) && value?.default) {
-            const propRef = new Ref(registeredName, value.default);
-            this.refs.push(propRef);
+            let propRef = this.refs.find(ref => ref.getName().name === registeredName.name);
+
+            if (!propRef) {
+                propRef = new Ref(registeredName, value.default);
+                this.refs.push(propRef);
+            }
 
             Object.defineProperty(this, registeredName.name, {
                 get: () => propRef.getValue()
@@ -136,8 +140,12 @@ export default class Component {
                 return;
             }
 
-            const propRef = new Ref(registeredName, value);
-            refThis.refs.push(propRef);
+            let propRef = refThis.refs.find(ref => ref.getName().name === registeredName.name);
+
+            if (!propRef) {
+                propRef = new Ref(registeredName, value);
+                refThis.refs.push(propRef);
+            }
 
             Object.defineProperty(refThis, registeredName.name, {
                 get: () => propRef.getValue()
@@ -158,9 +166,13 @@ export default class Component {
 
         const registeredName = this.namesRegister.registerName(name, PropType.DATA);
 
-        const dataRef = new Ref(registeredName, value);
-        this.refs.push(dataRef);
-        
+        let dataRef = this.refs.find(ref => ref.getName().name === registeredName.name);
+
+        if (!dataRef) {
+            dataRef = new Ref(registeredName, value);
+            this.refs.push(dataRef);
+        }
+
         Object.defineProperties(this, {
             [registeredName.name]: {
                 get: () => dataRef.getValue(),
@@ -171,6 +183,8 @@ export default class Component {
                 }
             }
         });
+
+        console.log("defined");
     }
 
     private data(dataProp: DataProp): void {
@@ -190,7 +204,15 @@ export default class Component {
 
         const refThis = this;
 
-        this.listeners[name].push((...args) => value.call(refThis, ...args));
+        if (typeof value === "function") {
+            const parsedFunction = (...args: any) => value.call(refThis, ...args);
+
+            if (this.listeners[name].some(listener => listener === parsedFunction)) {
+                return;
+            }
+
+            this.listeners[name].push(parsedFunction);
+        }
     }
 
     private watch(watchProp: WatchProp): void {
@@ -206,8 +228,12 @@ export default class Component {
 
         const parsedFunction = (...args: any) => value.call(refThis, ...args);
 
-        const methodRef = new Ref(registeredName, parsedFunction);
-        this.refs.push(methodRef);
+        let methodRef = this.refs.find(ref => ref.getName().name === registeredName.name);
+
+        if (!methodRef) {
+            methodRef = new Ref(registeredName, parsedFunction);
+            this.refs.push(methodRef);
+        }
         
         Object.assign(window, { [registeredName.name]: methodRef.getValue() });
         

@@ -303,13 +303,17 @@ export const parseModelAttributes = async (element: Element, refThis: { [key: st
     
             element.setAttribute("value", `${evalutated}`);
 
-            element.addEventListener("input", (e) => {
-                emitValue(e, modelAttr, modelValue, refThis);
-            });
-
-            element.addEventListener("change", (e) => {
-                emitValue(e, modelAttr, modelValue, refThis);
-            });
+            if (element instanceof HTMLInputElement) {
+                if (["radio", "checkbox"].includes(element.getAttribute("type") || "")){
+                    (element as HTMLInputElement).onchange = (e) => {
+                        emitValue(e, modelAttr, modelValue, refThis);
+                    };
+                } else {
+                    (element as HTMLInputElement).oninput = (e) => {
+                        emitValue(e, modelAttr, modelValue, refThis);
+                    };
+                }
+            }
         }
     }
 }
@@ -345,7 +349,7 @@ export const parseComputedEvents = async (element: Element, refThis: { [key: str
         const computed = element.getAttribute(attr);
         if (computed) {
             const computedValue = vm.runScriptSync(computed);
-            element.addEventListener(attr.replace("@", ""), computedValue);
+            (element as any)[attr.replace("@", "on")] = computedValue;
         }
 
         element.removeAttribute(attr);

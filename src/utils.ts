@@ -1,5 +1,6 @@
 import Component from "./subclasses/Component";
 import Ref from "./subclasses/Ref";
+import RemovedElements from "./subclasses/RemovedElements";
 import VirtualMachine from "./subclasses/VirtualMachine";
 import { AssociatedElement } from "./types";
 
@@ -18,6 +19,49 @@ export const updateRef = (refName: string, refThis: {[key:string]: any}, value: 
     refThis[refName] = value;
 
     refThis.refs.find((ref: Ref<any>) => ref.getName().name === refName)?.setValue(value);
+}
+
+export const putUnparsedInPlaceOfRemoved = (unparsedElement: Element, associatedElement: AssociatedElement, refThis: {[key:string]: any}): void => {
+    // Put unparsed element in place of removed element in virtual dom
+    const parsedParent: Element | null = refThis.mainNode.getAttribute("data-uuid") === unparsedElement.parentElement?.getAttribute("data-uuid")
+        ? refThis.mainNode
+        : refThis.mainNode.querySelector(`[data-uuid="${unparsedElement.parentElement?.getAttribute("data-uuid")}"]`);
+    let parsedSibling: Element | null  = refThis.mainNode.querySelector(`[data-uuid="${unparsedElement.nextElementSibling?.getAttribute("data-uuid")}"]`);
+    const parsedElement: Element | null = refThis.mainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
+
+    if (parsedElement && parsedParent) {
+        if (!parsedSibling && unparsedElement.nextElementSibling) {
+            parsedSibling = unparsedElement.nextElementSibling;
+    
+            const nextSibling = parsedParent.querySelector(`[data-uuid="${parsedSibling.nextElementSibling?.getAttribute("data-uuid")}"]`);
+            parsedParent.insertBefore(parsedSibling.cloneNode(true), nextSibling);
+        } else if (parsedSibling && unparsedElement.nextElementSibling && parsedSibling?.getAttribute("data-uuid") !== unparsedElement.nextElementSibling?.getAttribute("data-uuid")) {
+            parsedParent.replaceChild(unparsedElement.nextElementSibling, parsedSibling);
+
+            parsedSibling = unparsedElement.nextElementSibling;
+        }
+    }
+
+    if (parsedParent && !parsedElement) {
+        parsedParent.insertBefore(unparsedElement.cloneNode(true), parsedSibling);
+    } else if (parsedElement) {
+        parsedElement.replaceWith(unparsedElement.cloneNode(true));
+    }
+
+    if (parsedSibling?.hasAttribute("i-else")) {
+        const newUnparsedElement = refThis.unparsedMainNode
+            .querySelector(`[data-uuid="${(parsedSibling as HTMLElement).dataset.uuid || parsedSibling.getAttribute("data-uuid")}"]`);
+
+        if (newUnparsedElement) {
+            const newAssociatedElement: AssociatedElement = {
+                uuid: newUnparsedElement.getAttribute("data-uuid") || (newUnparsedElement as HTMLElement).dataset.uuid,
+                inTextContent: false,
+                inAttrNames: ["i-else"]
+            };
+
+            putUnparsedInPlaceOfRemoved(newUnparsedElement, newAssociatedElement, refThis);
+        }
+    }
 }
 
 export const associateElement = (element: Element, refThis: {[key:string]: any}): void => {
@@ -45,22 +89,6 @@ export const associateElement = (element: Element, refThis: {[key:string]: any})
 
         if(associatedElement.inTextContent || associatedElement.inAttrNames.length > 0) {
             ref.addAssociatedElement(associatedElement);
-        }
-    }
-
-    const previousSibling = element.previousElementSibling;
-
-    if (previousSibling?.hasAttribute("i-if") && element.hasAttribute("i-else")) {
-        const previousSiblingUuid = previousSibling.getAttribute("data-uuid") || (previousSibling as HTMLElement).dataset.uuid;
-
-        for (let ref of refThis.refs) {
-            if (ref.getAssociatedElements().find((el: AssociatedElement) => el.uuid === previousSiblingUuid)) {
-                ref.addAssociatedElement({
-                    uuid: element.getAttribute("data-uuid") || (element as HTMLElement).dataset.uuid,
-                    inTextContent: false,
-                    inAttrNames: ["i-else"]
-                });
-            }
         }
     }
 }
@@ -147,12 +175,10 @@ export const parseForVariables = (element: Element, refThis: { [key: string] : a
 export const removeElement = (condition: boolean, element: Element, refThis: {[key: string]: any}): void => {
     if (condition) {
         refThis.removedElements?.add(element);
-
-        element.remove();
         return;
     }
 
-    refThis.removedElements?.pop((element as HTMLElement).dataset.uuid as string);
+    (refThis.removedElements as RemovedElements).pop((element as HTMLElement).dataset.uuid as string);
 }
 
 export const parseConditionalRendering = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
@@ -431,6 +457,18 @@ export const parseComponents = async (element: Element, refThis: { [key: string]
             parseSingleComponent(component, element, refThis, vm);
         }
     }
+}
+
+export const parseRemovedElements = async (refThis: { [key: string] : any }): Promise<void> => {
+    (refThis.removedElements as RemovedElements).getRemovedElements().forEach(removedElement => {
+        const parsedElement = refThis.mainNode.querySelector(`[data-uuid="${removedElement.el?.getAttribute("data-uuid")}"]`);
+        const parsedDocElement = document.querySelector(`[data-uuid="${removedElement.el?.getAttribute("data-uuid")}"]`);
+
+        if (parsedElement && parsedDocElement) {
+            parsedElement.remove();
+            parsedDocElement.remove();
+        }
+    });
 }
 
 

@@ -26,6 +26,8 @@ class InfimoFactory {
             app.parentElement?.replaceChild(mainNode, app);
         }
 
+        await virtualDOM.initialConditionalRemoves();
+
         Object.assign(appThis, this);
     }
 

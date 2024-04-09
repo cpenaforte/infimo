@@ -1,5 +1,5 @@
 import { DataProp, InfimoObject, Listeners, MethodsProp, Prop, PropType, PropsProp, TypeConstructor, WatchProp } from "../types";
-import { parseDataInsertion, parseStructures, parseComponents, putUuid, updateAttributesAndChildren, fullClone } from "../utils";
+import { parseDataInsertion, parseStructures, parseComponents, putUuid, updateAttributesAndChildren, putUnparsedInPlaceOfRemoved, parseRemovedElements } from "../utils";
 import EventBus from "./EventBus";
 import NameRegister from "./NameRegister";
 import Ref from "./Ref";
@@ -286,51 +286,28 @@ export default class Component {
         let associatedElementsLength = dataRef.getAssociatedElements().length;
 
         while (true) {
-            const updatedDataRef = this.refs.find(ref => ref.getName().name === dataRef.getName().name);
+            const updatedDataRef = refThis.refs.find(ref => ref.getName().name === dataRef.getName().name);
             if (!updatedDataRef) break;
             
             associatedElementsLength = updatedDataRef.getAssociatedElements().length;
             const associatedElement = updatedDataRef.getAssociatedElements()[counter];
 
-            let virtualUnparsedElement = this.unparsedMainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
-            let virtualElement = this.mainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
+            let virtualUnparsedElement = refThis.unparsedMainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
+            let virtualElement = refThis.mainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
+
+            if (virtualUnparsedElement && (!virtualElement || virtualUnparsedElement?.hasAttribute("i-if"))) {
+                putUnparsedInPlaceOfRemoved(virtualUnparsedElement, associatedElement, refThis);
+
+                virtualElement = refThis.mainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
+            }
 
             if (!virtualUnparsedElement || !virtualElement) {
-                if ((this.unparsedMainNode as HTMLElement).dataset.uuid === associatedElement.uuid) {
-                    virtualUnparsedElement = this.unparsedMainNode;
+                if ((refThis.unparsedMainNode as HTMLElement).dataset.uuid === associatedElement.uuid) {
+                    virtualUnparsedElement = refThis.unparsedMainNode;
                 }
 
-                if ((this.mainNode as HTMLElement).dataset.uuid === associatedElement.uuid) {
-                    virtualElement = this.mainNode;
-                }
-
-                if (!virtualElement && virtualUnparsedElement) {
-                    if (virtualUnparsedElement.hasAttribute("i-if") || virtualUnparsedElement.hasAttribute("i-else")) {
-                        const removed = refThis.removedElements.getRemovedElement(associatedElement.uuid);
-                        console.log(virtualUnparsedElement, removed);
-                        if (removed) {
-                            const parsedParent = (this.mainNode as HTMLElement).dataset.uuid === (removed.parent as HTMLElement | null)?.dataset.uuid
-                                ? this.mainNode
-                                : this.mainNode.querySelector(`[data-uuid="${(removed.parent as HTMLElement | null)?.dataset.uuid || ""}"]`);
-                            const parsedSibling = removed.nextSibling
-                                ? parsedParent?.querySelector(`[data-uuid="${removed.nextSibling.getAttribute("data-uuid")}"]`) ?? null
-                                : null;
-
-                            console.log(parsedParent, parsedSibling);
-                            
-                            if (parsedSibling && parsedSibling.parentElement === parsedParent) {
-                                parsedParent?.insertBefore(fullClone(virtualUnparsedElement) as Element, parsedSibling);
-                            } else if (parsedParent) {
-                                parsedParent.appendChild(fullClone(virtualUnparsedElement) as Element);
-                            } else {
-                                document.body.insertBefore(fullClone(virtualUnparsedElement) as Element, parsedSibling);
-                            }
-
-                            this.removedElements.pop(associatedElement.uuid);
-
-                            virtualElement = refThis.mainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
-                        }
-                    }
+                if ((refThis.mainNode as HTMLElement).dataset.uuid === associatedElement.uuid) {
+                    virtualElement = refThis.mainNode;
                 }
 
                 if (!virtualUnparsedElement || !virtualElement) {
@@ -345,10 +322,10 @@ export default class Component {
             ) {
                 // set virtualElement equal to virtualUnparsedElement
                 virtualElement.replaceWith(virtualUnparsedElement.cloneNode(true) as Element);
-                virtualElement = this.mainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
+                virtualElement = refThis.mainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
 
-                if ((this.mainNode as HTMLElement).dataset.uuid === associatedElement.uuid) {
-                    virtualElement = this.mainNode;
+                if ((refThis.mainNode as HTMLElement).dataset.uuid === associatedElement.uuid) {
+                    virtualElement = refThis.mainNode;
                 }
 
                 if (!virtualElement) {
@@ -386,19 +363,25 @@ export default class Component {
             await parseStructures(virtualElement, refThis, vm);
             await parseComponents(virtualElement, refThis, vm);
             await parseDataInsertion(virtualElement, refThis, vm);
-            
-            virtualElement = virtualElement.cloneNode(true) as Element;
 
+            virtualElement = virtualElement.cloneNode(true) as Element;
+            
             const docElement = document.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
             docElement && updateAttributesAndChildren(virtualElement, docElement);
-
+            
             counter++;
             if (counter === associatedElementsLength) break;
         }
+
+        await parseRemovedElements(refThis);
     }
 
     public async createMainNode(): Promise<void> {
         this.mainNode = await this.parseTemplate(this.template);
+    }
+
+    public async initialConditionalRemoves(): Promise<void> {
+        await parseRemovedElements(this);
     }
 
     public getMainNode(): Element {
@@ -411,5 +394,9 @@ export default class Component {
 
     public getComponents(): Component[] {
         return this.components;
+    }
+
+    protected getRemovedElements(): RemovedElements {
+        return this.removedElements;
     }
 }

@@ -13,6 +13,10 @@ export default class VirtualDOM {
         await this.mainComponent.createMainNode();
     }
 
+    public async initialConditionalRemoves(): Promise<void> {
+        await this.mainComponent.initialConditionalRemoves();
+    }
+
     public getMainNode(): Element {
         return this.mainComponent.getMainNode();
     }

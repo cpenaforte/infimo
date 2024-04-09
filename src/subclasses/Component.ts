@@ -183,8 +183,6 @@ export default class Component {
                 }
             }
         });
-
-        console.log("defined");
     }
 
     private data(dataProp: DataProp): void {

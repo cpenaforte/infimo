@@ -1,4 +1,5 @@
 import Component from "./subclasses/Component";
+import EventBus from "./subclasses/EventBus";
 import Ref from "./subclasses/Ref";
 import RemovedElements from "./subclasses/RemovedElements";
 import VirtualMachine from "./subclasses/VirtualMachine";
@@ -9,10 +10,6 @@ export const getPropertyValue = (property: string, refThis: {[key:string]: any})
     if (descriptor) {
         return descriptor.get? descriptor.get() : descriptor.value;
     }
-}
-
-export const fullClone = (obj: object): object => {
-    return Object.getPrototypeOf(Object.create(obj));
 }
 
 export const updateRef = (refName: string, refThis: {[key:string]: any}, value: any): void => {
@@ -94,7 +91,9 @@ export const associateElement = (element: Element, refThis: {[key:string]: any})
 }
 
 export const putUuid = async (element: Element, refThis: { [key: string] : any }): Promise<void> => {
-    if (!element.hasAttribute("data-uuid")) {
+    if (!element.hasAttribute("data-uuid")
+        || (element.getRootNode() as Element).querySelectorAll(`[data-uuid="${element.getAttribute("data-uuid")}"]`).length > 1
+    ) {
         const uuid = Math.random().toString(36).substring(7);
         element.setAttribute("data-uuid", uuid);
     
@@ -108,10 +107,21 @@ export const putUuid = async (element: Element, refThis: { [key: string] : any }
     };
 }
 
-export const parseListRendering = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
+export const removeUuid = (element: Element): void => {
+    element.removeAttribute("data-uuid");
+
+    // remove children data-uuid
+    for (let child of element.childNodes) {
+        if (child.nodeType === 1) {
+            removeUuid(child as Element);
+        }
+    }
+}
+
+export const parseListRendering = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
     const list = element.getAttribute("i-for");
     if (!list) {
-        return;
+        return element;
     };
 
     const vm = virtualMachine || new VirtualMachine();
@@ -129,7 +139,7 @@ export const parseListRendering = async (element: Element, refThis: { [key: stri
         const clone = element.cloneNode(true) as Element;
 
         clone.removeAttribute("i-for");
-        clone.removeAttribute("data-uuid");
+        removeUuid(clone);
         
         await putUuid(clone, refThis);
         const cloneUuid = (clone as HTMLElement).dataset.uuid as string;
@@ -166,10 +176,19 @@ export const parseListRendering = async (element: Element, refThis: { [key: stri
     });
 
     element.remove();
+
+    return element;
 }
 
-export const parseForVariables = (element: Element, refThis: { [key: string] : any }): object => {
-    return Object.assign(fullClone(refThis), ((refThis?.forVariables || {})[(element as HTMLElement).dataset.uuid as string] || {}));
+export const parseForVariables = (element: Element, refThis: { [key: string] : any }): { [key: string] : any } => {
+    // If element don't have a uuid as key of refThis.forVariables, repeat with the parent node
+    const variables = ((refThis?.forVariables || {})[(element as HTMLElement).dataset.uuid as string] || {});
+
+    if (!Object.keys(variables).length && element.parentElement && (element.parentElement as HTMLElement).dataset.uuid) {
+        return parseForVariables(element.parentElement, refThis);
+    }
+
+    return Object.assign(refThis, variables);
 }
 
 export const removeElement = (condition: boolean, element: Element, refThis: {[key: string]: any}): void => {
@@ -181,9 +200,9 @@ export const removeElement = (condition: boolean, element: Element, refThis: {[k
     (refThis.removedElements as RemovedElements).pop((element as HTMLElement).dataset.uuid as string);
 }
 
-export const parseConditionalRendering = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
+export const parseConditionalRendering = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
     const condition = element.getAttribute("i-if");
-    if (!condition) return;
+    if (!condition) return element;
 
     const parsedThis = parseForVariables(element, refThis);
     
@@ -199,7 +218,7 @@ export const parseConditionalRendering = async (element: Element, refThis: { [ke
             removeElement(false, sibling, refThis);
         }
 
-        return;
+        return element;
     }
 
     removeElement(false, element, refThis);
@@ -207,6 +226,8 @@ export const parseConditionalRendering = async (element: Element, refThis: { [ke
     if (sibling?.hasAttribute("i-else")) {
         removeElement(true, sibling, refThis);
     }
+
+    return element;
 }
 
 export const replaceBracesCode = (text: string, vm: VirtualMachine): string => {
@@ -216,12 +237,14 @@ export const replaceBracesCode = (text: string, vm: VirtualMachine): string => {
     }).replace(/{{/g, "").replace(/}}/g, "");
 }
 
-export const parseBracesCode = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
-    const parsedThis = parseForVariables(element, refThis);
+export const parseBracesCode = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
+    let clonedElement = element;
+
+    const parsedThis = parseForVariables(clonedElement, refThis);
     const vm = virtualMachine || new VirtualMachine();
     vm.initThis(parsedThis);
     
-    for( let child of element.childNodes) {
+    for( let child of clonedElement.childNodes) {
         if (child.nodeType === 3) {
             const text = (child as Element).textContent;
             if (text?.includes("{{")) {
@@ -229,9 +252,11 @@ export const parseBracesCode = async (element: Element, refThis: { [key: string]
             }
         }
     };
+
+    return clonedElement;
 }
 
-export const parseCustomAttributes = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
+export const parseCustomAttributes = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
     const custom = element.getAttribute("custom-attr");
     if (custom) {
         element.removeAttribute("custom-attr");
@@ -254,6 +279,8 @@ export const parseCustomAttributes = async (element: Element, refThis: { [key: s
 
         element.setAttribute(attrName, attrValue);
     }
+
+    return element;
 }
 
 const emitValue = (event: Event, modelName: string, modelValue: string, refThis: { [key: string] : any }): void => {
@@ -287,7 +314,7 @@ const emitValue = (event: Event, modelName: string, modelValue: string, refThis:
     }
 }
 
-export const parseModelAttributes = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
+export const parseModelAttributes = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
     const modelAttr = element.getAttributeNames().find(attr => attr === "i-model");
     if (modelAttr) {
         const modelValue = element.getAttribute(modelAttr);
@@ -316,15 +343,17 @@ export const parseModelAttributes = async (element: Element, refThis: { [key: st
             }
         }
     }
+
+    return element;
 }
 
-export const parseComputedAttributes = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
-    const computedAttrs = element.getAttributeNames().filter(attr => attr.startsWith(":"));
-
+export const parseComputedAttributes = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
     const parsedThis = parseForVariables(element, refThis);
-
+    
     const vm = virtualMachine || new VirtualMachine();
     vm.initThis(parsedThis);
+    
+    const computedAttrs = element.getAttributeNames().filter(attr => attr.startsWith(":"));
 
     for (let attr of computedAttrs) {
         const computed = element.getAttribute(attr);
@@ -335,15 +364,17 @@ export const parseComputedAttributes = async (element: Element, refThis: { [key:
         
         element.removeAttribute(attr);
     };
+
+    return element;
 }
 
-export const parseComputedEvents = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
-    const computedEvents = element.getAttributeNames().filter(attr => attr.startsWith("@"));
-
+export const parseComputedEvents = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
     const parsedThis = parseForVariables(element, refThis);
-
+    
     const vm = virtualMachine || new VirtualMachine();
     vm.initThis(parsedThis);
+    
+    const computedEvents = element.getAttributeNames().filter(attr => attr.startsWith("@"));
 
     for (let attr of computedEvents) {
         const computed = element.getAttribute(attr);
@@ -354,49 +385,59 @@ export const parseComputedEvents = async (element: Element, refThis: { [key: str
 
         element.removeAttribute(attr);
     };
+
+    return element;
 }
 
-export const parseStructures = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
-    await parseConditionalRendering(element, refThis, virtualMachine);
-    await parseListRendering(element, refThis, virtualMachine);
+export const parseStructures = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
+    element = await parseConditionalRendering(element, refThis, virtualMachine);
+    element = await parseListRendering(element, refThis, virtualMachine);
 
     for (let child of element.childNodes) {
         if (child.nodeType === 1) {
-            await parseStructures(child as Element, refThis, virtualMachine);
+            child = await parseStructures(child as Element, refThis, virtualMachine);
         }
     };
+
+    return element;
 }
 
-export const parseDataInsertion = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
-    await parseCustomAttributes(element, refThis, virtualMachine);
+export const parseDataInsertion = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
+    element = await parseCustomAttributes(element, refThis, virtualMachine);
 
-    await parseComputedAttributes(element, refThis, virtualMachine);
+    element = await parseComputedAttributes(element, refThis, virtualMachine);
 
-    await parseModelAttributes(element, refThis, virtualMachine);
+    element = await parseModelAttributes(element, refThis, virtualMachine);
 
-    await parseComputedEvents(element, refThis, virtualMachine);
+    element = await parseComputedEvents(element, refThis, virtualMachine);
 
-    await parseBracesCode(element, refThis, virtualMachine);
+    element = await parseBracesCode(element, refThis, virtualMachine);
 
     for (let child of element.childNodes) {
         if (child.nodeType === 1) {
-            await parseDataInsertion(child as Element, refThis, virtualMachine);
+            child = await parseDataInsertion(child as Element, refThis, virtualMachine);
         }
     };
+
+    return element;
 }
 
-export const parseSingleComponent = async (component: Component, componentElement: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
+export const parseSingleComponent = async (component: Component, componentElement: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
+    // parse i-for variables
+    const parsedThis: typeof refThis = parseForVariables(componentElement, refThis);
+
     const vm = virtualMachine || new VirtualMachine();
-    vm.initThis(refThis);
+    vm.initThis(parsedThis);
+
+    const clonedElement = componentElement.cloneNode(true) as Element;
 
     // Parse component props
-
-    const props = componentElement.getAttributeNames().filter(attr => !attr.startsWith("@") && !attr.startsWith("i-") && (attr !== "data-uuid"));
+    const props = clonedElement.getAttributeNames().filter(attr => !attr.startsWith("@") && !attr.startsWith("i-") && (attr !== "data-uuid"));
 
     let parsedProps: { [key: string]: any } = {};
 
     for (let prop of props) {
-        const propValue = componentElement.getAttribute(prop);
+        const propValue = clonedElement.getAttribute(prop);
 
         if (prop.startsWith(":")) {
             const propName = prop.replace(":", "");
@@ -406,42 +447,41 @@ export const parseSingleComponent = async (component: Component, componentElemen
             parsedProps[prop] = propValue || true;
         }
 
-        componentElement.removeAttribute(prop);
+        clonedElement.removeAttribute(prop);
     }
 
     component.setProps(parsedProps);
 
     // Parse component events
 
-    const events = componentElement.getAttributeNames().filter(attr => attr.startsWith("@"));
+    const events = clonedElement.getAttributeNames().filter(attr => attr.startsWith("@"));
 
     for (let event of events) {
-        const eventValue = componentElement.getAttribute(event);
+        const eventValue = clonedElement.getAttribute(event);
         if (!eventValue) continue;
 
         const eventName = event.replace("@", "");
         const eventFunction = vm.runScriptSync(eventValue);
 
-        const uuid = (componentElement as HTMLElement).dataset.uuid || (componentElement.getAttribute("data-uuid")) || component.getName();
+        const uuid = (clonedElement as HTMLElement).dataset.uuid || (clonedElement.getAttribute("data-uuid")) || component.getName();
 
-        refThis.eventBus.on(eventName, eventFunction, uuid);
+        (parsedThis.eventBus as EventBus).on(eventName, eventFunction, uuid);
 
-        componentElement.removeAttribute(event);
+        clonedElement.removeAttribute(event);
     }
 
     await component.createMainNode();
 
     const componentNode = component.getMainNode();
-    componentNode.setAttribute("data-uuid", (componentElement as HTMLElement).dataset.uuid || (componentElement.getAttribute("data-uuid") as string));
+    componentNode.setAttribute("data-uuid", (clonedElement as HTMLElement).dataset.uuid || (clonedElement.getAttribute("data-uuid") as string));
     componentNode.setAttribute("data-component", component.getName());
 
-    componentElement.replaceWith(componentNode);
+    return componentNode;
 }
 
 
-export const parseComponents = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<void> => {
+export const parseComponents = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
     const components = refThis.components as Component[];
-
     for (let component of components) {
         const componentName = component.getName();
         const templateTagName = `${componentName.toLocaleLowerCase()}-component`;
@@ -451,16 +491,20 @@ export const parseComponents = async (element: Element, refThis: { [key: string]
         const vm = virtualMachine || new VirtualMachine();
         vm.initThis(refThis);
 
-        
         // find props, validate them and pass them to the component
         for (let componentElement of componentElements) {
-            parseSingleComponent(component, componentElement as Element, refThis, vm);
+            const newElement = await parseSingleComponent(component, componentElement as Element, refThis, vm);
+            componentElement.replaceWith(newElement);
         }
-        
+
         if (element.tagName.toLocaleLowerCase() === templateTagName) {
-            parseSingleComponent(component, element, refThis, vm);
+            const newElement = await parseSingleComponent(component, element, refThis, vm);
+            element.replaceWith(newElement);
+            element = newElement;
         }
     }
+
+    return element;
 }
 
 export const parseRemovedElements = async (refThis: { [key: string] : any }): Promise<void> => {

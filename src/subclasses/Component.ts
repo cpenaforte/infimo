@@ -11,12 +11,12 @@ export default class Component {
     private template: string;
     private unparsedMainNode: Element;
     private mainNode: Element;
+    private eventBus: EventBus;
+    private components: Component[];
     private listeners: Listeners;
     private refs: Ref<any>[];
     private componentProps : PropsProp;
     private namesRegister: NameRegister;
-    private components: Component[];
-    private eventBus: EventBus;
     private removedElements: RemovedElements;
 
     constructor(infimoObject: InfimoObject, eventBus: EventBus) {
@@ -249,10 +249,10 @@ export default class Component {
         this.components.forEach(component => {
             parsedTemplate = parsedTemplate.replace(new RegExp(`<${component.getName()}`, "g"), `<${component.getName().toLocaleLowerCase()}-component`);
         });
-
+        
         const step = document.createElement("div");
         step.innerHTML = parsedTemplate;
-        const element = step.firstElementChild;
+        let element = step.firstElementChild;
 
         if (element) {
             const vm = new VirtualMachine();
@@ -262,9 +262,9 @@ export default class Component {
 
             this.unparsedMainNode = element.cloneNode(true) as Element;
 
-            await parseStructures(element, this, vm);
-            await parseComponents(element, this, vm);
-            await parseDataInsertion(element, this, vm);
+            element = await parseStructures(element, this, vm);
+            element = await parseComponents(element, this, vm);
+            element = await parseDataInsertion(element, this, vm);
 
             return element;
         }
@@ -309,6 +309,7 @@ export default class Component {
 
         let associatedElementsLength = dataRef.getAssociatedElements().length;
 
+        // loop through all associated elements and update them
         while (true) {
             const updatedDataRef = refThis.refs.find(ref => ref.getName().name === dataRef.getName().name);
             if (!updatedDataRef) break;
@@ -319,12 +320,14 @@ export default class Component {
             let virtualUnparsedElement = refThis.unparsedMainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
             let virtualElement = refThis.mainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
 
+            // Put unparsed element in place of removed i-if element
             if (virtualUnparsedElement && (!virtualElement || virtualUnparsedElement?.hasAttribute("i-if"))) {
                 putUnparsedInPlaceOfRemoved(virtualUnparsedElement, associatedElement, refThis);
 
                 virtualElement = refThis.mainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
             }
 
+            // if virtualUnparsedElement or virtualElement is missing, vreify if the corresponding main node is the missing element
             if (!virtualUnparsedElement || !virtualElement) {
                 if ((refThis.unparsedMainNode as HTMLElement).dataset.uuid === associatedElement.uuid) {
                     virtualUnparsedElement = refThis.unparsedMainNode;
@@ -341,6 +344,7 @@ export default class Component {
                 }
             };
 
+            // if virtualUnparsedElement is a component, replace it with the component
             if (virtualUnparsedElement?.tagName !== virtualElement?.tagName
                 && virtualUnparsedElement?.tagName.toLowerCase().includes("-component")
             ) {
@@ -358,13 +362,13 @@ export default class Component {
                     continue;
                 }
             } else {
+                // update attributes and textContent
                 for (let attr of associatedElement.inAttrNames) {
                     const computed = virtualUnparsedElement.getAttribute(attr);
                     if (computed) {
                         virtualElement.setAttribute(attr, computed);
                     }
                     
-    
                     //update unparsed element if attr is missing
                     if (!virtualUnparsedElement.hasAttribute(attr)
                         && virtualElement.hasAttribute(attr)
@@ -384,12 +388,14 @@ export default class Component {
                 }
             }
 
-            await parseStructures(virtualElement, refThis, vm);
-            await parseComponents(virtualElement, refThis, vm);
-            await parseDataInsertion(virtualElement, refThis, vm);
+            // parse elements
+            virtualElement = await parseStructures(virtualElement, refThis, vm);
+            virtualElement = await parseComponents(virtualElement, refThis, vm);
+            virtualElement = await parseDataInsertion(virtualElement, refThis, vm);
 
             virtualElement = virtualElement.cloneNode(true) as Element;
             
+            // update attributes and children in the DOM
             const docElement = document.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
             docElement && updateAttributesAndChildren(virtualElement, docElement);
             
@@ -397,6 +403,7 @@ export default class Component {
             if (counter === associatedElementsLength) break;
         }
 
+        // remove i-if elements from the tree that are set to be removed
         await parseRemovedElements(refThis);
     }
 

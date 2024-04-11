@@ -248,6 +248,7 @@ export default class Component {
         let parsedTemplate = `${templateStr}`;
         this.components.forEach(component => {
             parsedTemplate = parsedTemplate.replace(new RegExp(`<${component.getName()}`, "g"), `<${component.getName().toLocaleLowerCase()}-component`);
+            parsedTemplate = parsedTemplate.replace(new RegExp(`</${component.getName()}`, "g"), `</${component.getName().toLocaleLowerCase()}-component`);
         });
         
         const step = document.createElement("div");
@@ -410,7 +411,7 @@ export default class Component {
     public async createMainNode(): Promise<void> {
         this.mainNode = await this.parseTemplate(this.template);
     }
-
+    
     public async initialConditionalRemoves(): Promise<void> {
         await parseRemovedElements(this);
     }
@@ -427,7 +428,7 @@ export default class Component {
         return this.components;
     }
 
-    protected getRemovedElements(): RemovedElements {
+    public getRemovedElements(): RemovedElements {
         return this.removedElements;
     }
 }

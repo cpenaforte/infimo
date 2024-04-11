@@ -202,13 +202,13 @@ export const removeElement = (condition: boolean, element: Element, refThis: {[k
 
 export const parseConditionalRendering = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
     const condition = element.getAttribute("i-if");
-    if (!condition) return element;
+    if (!condition?.length) return element;
 
     const parsedThis = parseForVariables(element, refThis);
     
     const vm = virtualMachine || new VirtualMachine();
     vm.initThis(parsedThis);
-    
+
     const sibling = element.nextElementSibling;
 
     if (!vm.runScriptSync(condition)) {
@@ -471,6 +471,11 @@ export const parseSingleComponent = async (component: Component, componentElemen
     }
 
     await component.createMainNode();
+
+    const removedElements = component.getRemovedElements().getRemovedElements();
+    for (let removedElement of removedElements) {
+        refThis.removedElements?.add(removedElement.el);
+    }
 
     const componentNode = component.getMainNode();
     componentNode.setAttribute("data-uuid", (clonedElement as HTMLElement).dataset.uuid || (clonedElement.getAttribute("data-uuid") as string));

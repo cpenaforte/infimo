@@ -380,7 +380,9 @@ export const parseComputedEvents = async (element: Element, refThis: { [key: str
         const computed = element.getAttribute(attr);
         if (computed) {
             const computedValue = vm.runScriptSync(computed);
-            (element as any)[attr.replace("@", "on")] = computedValue;
+            if (typeof computedValue === "function"){
+                (element as any)[attr.replace("@", "on")] = () => computedValue();
+            }
         }
 
         element.removeAttribute(attr);

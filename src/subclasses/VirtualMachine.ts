@@ -19,7 +19,7 @@ export default class VirtualMachine {
 
     runScriptSync(script: string): any {
         let result = null;
-        
+
         try {
             result = new vm.Script(script).runInNewContext(this.context);
         } catch (e) {

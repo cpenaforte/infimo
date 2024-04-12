@@ -64,8 +64,14 @@ new Infimo.default({
             <button i-if="inputValue" type="button" @click="() =>blink('ok')">Blink</button>
             <button i-else type="button" @click="()=>blink('ok')" disabled>Disabled</button>
             <ul>
+                <li i-for="number in ['ab','asd','asdc']">
+                    <Button :btn-text="\`\${number + inputValue}\`" btn-type="button" @showClick="clickedButton"></Button>
+                </li>
+            </ul>
+            <ul>
                 <li i-for="number in ['aba2','a23sd','as22dc']">{{ number + inputValue }}</li>
             </ul>
+            <Button i-if="inputValue.length > 0" :btn-text="inputValue" :btn-type="inputValue" @showClick="clickedButton"></Button>
         </div>
     `
 }).build(this || {}, "#app");

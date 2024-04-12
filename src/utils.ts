@@ -381,7 +381,7 @@ export const parseComputedEvents = async (element: Element, refThis: { [key: str
         if (computed) {
             const computedValue = vm.runScriptSync(computed);
             if (typeof computedValue === "function"){
-                (element as any)[attr.replace("@", "on")] = () => computedValue();
+                (element as any)[attr.replace("@", "on")] = (...args:any) => computedValue(...args);
             }
         }
 

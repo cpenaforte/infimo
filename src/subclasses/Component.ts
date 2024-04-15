@@ -97,7 +97,7 @@ export default class Component {
                 if (propDefinition.required && !value) {
                     throw new Error(`Prop ${parsedName} is required`);
                 }
-                if (value === (undefined || null)) {
+                if (value === undefined || value === null) {
                     value = propDefinition.default;
                 }
                 if (Array.isArray(propDefinition.type)) {

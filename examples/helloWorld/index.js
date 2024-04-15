@@ -65,7 +65,7 @@ new Infimo.default({
             <button i-else type="button" @click="()=>blink('ok')" disabled>Disabled</button>
             <ul>
                 <li i-for="number in ['ab','asd','asdc']">
-                    <Button :btn-text="\`\${number + inputValue}\`" btn-type="button" @showClick="clickedButton"></Button>
+                    <Button :btn-text="\`\${number + inputValue}\`" :btn-type="undefined" @showClick="clickedButton"></Button>
                 </li>
             </ul>
             <ul>

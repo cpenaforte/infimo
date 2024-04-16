@@ -1,4 +1,4 @@
-import { DataProp, InfimoObject, Listeners, MethodsProp, Prop, PropType, PropsProp, TypeConstructor, WatchProp } from "../types";
+import { ComponentsProp, DataProp, InfimoObject, Listeners, MethodsProp, Prop, PropType, PropsProp, TypeConstructor, WatchProp } from "../types";
 import { parseDataInsertion, parseStructures, parseComponents, putUuid, updateAttributesAndChildren, putUnparsedInPlaceOfRemoved, parseRemovedElements } from "../utils";
 import EventBus from "./EventBus";
 import NameRegister from "./NameRegister";
@@ -12,6 +12,7 @@ export default class Component {
     private unparsedMainNode: Element;
     private mainNode: Element;
     private eventBus: EventBus;
+    private componentsConstructors: ComponentsProp;
     private components: Component[];
     private listeners: Listeners;
     private refs: Ref<any>[];
@@ -24,7 +25,8 @@ export default class Component {
         this.unparsedMainNode = document.createElement("div");
         this.mainNode = document.createElement("div");
         this.template = infimoObject.template;
-        this.components = infimoObject.components || [];
+        this.componentsConstructors = infimoObject.components || [];
+        this.components = [];
         this.listeners = {};
         this.refs = [];
         this.componentProps = {};
@@ -71,8 +73,6 @@ export default class Component {
     }
 
     setProps(propsToSet: { [key: string]: any}): void {
-        const refThis = this;
-
         const checkType = (value: any, type: TypeConstructor) => {
             if (value === null) return false;
 
@@ -83,7 +83,7 @@ export default class Component {
             // get prop definition in componentProps, validate the type and, if is valid, use defineProperty to set the value
             // parse name, substituting kebab-case for camelCase
             const parsedName = name.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
-            const propDefinition: Prop<any> = refThis.componentProps[parsedName];
+            const propDefinition: Prop<any> = this.componentProps[parsedName];
 
             if (!propDefinition) {
                 throw new Error(`Prop ${parsedName} does not exist`);
@@ -127,27 +127,26 @@ export default class Component {
             }
 
             // get registered name, create a new Ref and push it to refs. Also, create a getter for the prop
-            const registeredName = refThis.namesRegister.getNames().find(registeredName => registeredName.name === parsedName && registeredName.type === PropType.PROPS);
+            const registeredName = this.namesRegister.getNames().find(registeredName => registeredName.name === parsedName && registeredName.type === PropType.PROPS);
             if (!registeredName) {
                 throw new Error(`Prop ${parsedName} does not exist`);
             }
 
             // check if ref exist, if it does, update the value
-            const ref = refThis.refs.find(ref => ref.getName().name === registeredName.name);
+            const ref = this.refs.find(ref => ref.getName().name === registeredName.name);
             if (ref) {
                 ref.setValue(value);
 
                 return;
             }
 
-            let propRef = refThis.refs.find(ref => ref.getName().name === registeredName.name);
-
+            let propRef = this.refs.find(ref => ref.getName().name === registeredName.name);
             if (!propRef) {
                 propRef = new Ref(registeredName, value);
-                refThis.refs.push(propRef);
+                this.refs.push(propRef);
             }
 
-            Object.defineProperty(refThis, registeredName.name, {
+            Object.defineProperty(this, registeredName.name, {
                 get: () => propRef.getValue()
             });
         });
@@ -246,11 +245,12 @@ export default class Component {
 
     private async parseTemplate(templateStr: string): Promise<Element> {
         let parsedTemplate = `${templateStr}`;
-        this.components.forEach(component => {
-            parsedTemplate = parsedTemplate.replace(new RegExp(`<${component.getName()}`, "g"), `<${component.getName().toLocaleLowerCase()}-component`);
-            parsedTemplate = parsedTemplate.replace(new RegExp(`</${component.getName()}`, "g"), `</${component.getName().toLocaleLowerCase()}-component`);
+
+        this.componentsConstructors.forEach(([name, _constructor]) => {
+            parsedTemplate = parsedTemplate.replace(new RegExp(`<${name}`, "g"), `<${name.toLocaleLowerCase()}-component`);
+            parsedTemplate = parsedTemplate.replace(new RegExp(`</${name}`, "g"), `</${name.toLocaleLowerCase()}-component`);
         });
-        
+
         const step = document.createElement("div");
         step.innerHTML = parsedTemplate;
         let element = step.firstElementChild;

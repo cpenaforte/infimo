@@ -3,7 +3,7 @@ import EventBus from "./subclasses/EventBus";
 import Ref from "./subclasses/Ref";
 import RemovedElements from "./subclasses/RemovedElements";
 import VirtualMachine from "./subclasses/VirtualMachine";
-import { AssociatedElement } from "./types";
+import { AssociatedElement, ComponentsProp } from "./types";
 
 export const getPropertyValue = (property: string, refThis: {[key:string]: any}): any => {
     const descriptor = Object.getOwnPropertyDescriptor(refThis, property);
@@ -452,6 +452,8 @@ export const parseSingleComponent = async (component: Component, componentElemen
         clonedElement.removeAttribute(prop);
     }
 
+    console.log(parsedProps);
+
     component.setProps(parsedProps);
 
     // Parse component events
@@ -488,9 +490,8 @@ export const parseSingleComponent = async (component: Component, componentElemen
 
 
 export const parseComponents = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
-    const components = refThis.components as Component[];
-    for (let component of components) {
-        const componentName = component.getName();
+    const componentsConstructors = refThis.componentsConstructors as ComponentsProp;
+    for (let [componentName, constructor] of componentsConstructors) {
         const templateTagName = `${componentName.toLocaleLowerCase()}-component`;
 
         const componentElements = element.querySelectorAll(templateTagName);
@@ -500,11 +501,13 @@ export const parseComponents = async (element: Element, refThis: { [key: string]
 
         // find props, validate them and pass them to the component
         for (let componentElement of componentElements) {
+            const component = constructor();
             const newElement = await parseSingleComponent(component, componentElement as Element, refThis, vm);
             componentElement.replaceWith(newElement);
         }
 
         if (element.tagName.toLocaleLowerCase() === templateTagName) {
+            const component = constructor();
             const newElement = await parseSingleComponent(component, element, refThis, vm);
             element.replaceWith(newElement);
             element = newElement;

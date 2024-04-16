@@ -24,10 +24,11 @@ export type PropsProp = { [key: string]: Prop<any> };
 export type DataProp = { [key: string]: any };
 export type WatchProp = { [key: string]: (newValue?: any, oldValue?: any) => void };
 export type MethodsProp = { [key: string]: Function };
+export type ComponentsProp = ([string, () => Component])[]
 
 export type InfimoObject = {
     name: string,
-    components?: Component[],
+    components?: ComponentsProp,
     props?: PropsProp,
     data?: DataProp,
     watch?: WatchProp,

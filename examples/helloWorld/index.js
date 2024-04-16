@@ -15,6 +15,7 @@ const Button = Infimo.default.defineComponent({
     },
     methods: {
         onClick() {
+            console.log(this);
             this.emit("showClick", this.btnText);
         }
     },

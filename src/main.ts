@@ -31,8 +31,8 @@ class InfimoFactory {
         Object.assign(appThis, this);
     }
 
-    public static defineComponent(infimoObject: InfimoObject): Component {
-        return new Component(infimoObject, InfimoFactory.EVENT_BUS);
+    public static defineComponent(infimoObject: InfimoObject): [string, () => Component] {
+        return [infimoObject.name, () => new Component(infimoObject, InfimoFactory.EVENT_BUS)];
     }
 }
 

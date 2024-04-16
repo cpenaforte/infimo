@@ -32,6 +32,12 @@ export type InfimoObject = {
     props?: PropsProp,
     data?: DataProp,
     watch?: WatchProp,
+    beforeCreate?: () => Promise<void> | void,
+    created?: () => Promise<void> | void,
+    beforeMount?: () => Promise<void> | void,
+    mounted?: () => Promise<void> | void,
+    beforeUpdate?: () => Promise<void> | void,
+    updated?: () => Promise<void> | void,
     methods?: MethodsProp,
     template: string,
 };
@@ -43,8 +49,16 @@ export const enum PropType {
     METHODS = "methods"
 };
 
-export type RegisteredName = {name: string, type: PropType};
+export type LifeCycle = {
+    beforeCreate: () => Promise<void>,
+    created: () => Promise<void>,
+    beforeMount: () => Promise<void>,
+    mounted: () => Promise<void>,
+    beforeUpdate: () => Promise<void>,
+    updated: () => Promise<void>,
+};
 
+export type RegisteredName = {name: string, type: PropType};
 export type RegisteredNames = RegisteredName[];
 
 export type Listeners = { [key: string]: ((newValue?: any, oldValue?: any) => void)[] };

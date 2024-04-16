@@ -489,7 +489,7 @@ export const parseSingleComponent = async (component: Component, componentElemen
 }
 
 
-export const parseComponents = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
+export const parseComponents = async (element: Element, isHydrating: boolean, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
     const componentsConstructors = refThis.componentsConstructors as ComponentsProp;
     for (let [componentName, constructor] of componentsConstructors) {
         const templateTagName = `${componentName.toLocaleLowerCase()}-component`;
@@ -504,6 +504,9 @@ export const parseComponents = async (element: Element, refThis: { [key: string]
             const component = constructor();
             const newElement = await parseSingleComponent(component, componentElement as Element, refThis, vm);
             componentElement.replaceWith(newElement);
+            isHydrating
+                ? await component.getLifeCycle().updated()
+                : await component.getLifeCycle().mounted();
         }
 
         if (element.tagName.toLocaleLowerCase() === templateTagName) {
@@ -511,6 +514,9 @@ export const parseComponents = async (element: Element, refThis: { [key: string]
             const newElement = await parseSingleComponent(component, element, refThis, vm);
             element.replaceWith(newElement);
             element = newElement;
+            isHydrating
+                ? await component.getLifeCycle().updated()
+                : await component.getLifeCycle().mounted();
         }
     }
 

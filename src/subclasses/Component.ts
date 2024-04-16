@@ -1,4 +1,4 @@
-import { ComponentsProp, DataProp, InfimoObject, Listeners, MethodsProp, Prop, PropType, PropsProp, TypeConstructor, WatchProp } from "../types";
+import { ComponentsProp, DataProp, InfimoObject, LifeCycle, Listeners, MethodsProp, Prop, PropType, PropsProp, TypeConstructor, WatchProp } from "../types";
 import { parseDataInsertion, parseStructures, parseComponents, putUuid, updateAttributesAndChildren, putUnparsedInPlaceOfRemoved, parseRemovedElements } from "../utils";
 import EventBus from "./EventBus";
 import NameRegister from "./NameRegister";
@@ -13,20 +13,40 @@ export default class Component {
     private mainNode: Element;
     private eventBus: EventBus;
     private componentsConstructors: ComponentsProp;
-    private components: Component[];
+    private lifeCycle: LifeCycle;
     private listeners: Listeners;
     private refs: Ref<any>[];
     private componentProps : PropsProp;
     private namesRegister: NameRegister;
     private removedElements: RemovedElements;
 
+    private parseLifeCycleHook = (hook?: () => Promise<void> | void): () => Promise<void> => {
+        if (!hook) return async () => {};
+
+        return async () => {
+            const maybePromise = hook();
+            if (maybePromise instanceof Promise) {
+                await maybePromise;
+            }
+        }
+    }
+
     constructor(infimoObject: InfimoObject, eventBus: EventBus) {
+        this.lifeCycle = {
+            beforeCreate: this.parseLifeCycleHook(infimoObject.beforeCreate),
+            created: this.parseLifeCycleHook(infimoObject.created),
+            beforeMount: this.parseLifeCycleHook(infimoObject.beforeMount),
+            mounted: this.parseLifeCycleHook(infimoObject.mounted),
+            beforeUpdate: this.parseLifeCycleHook(infimoObject.beforeUpdate),
+            updated: this.parseLifeCycleHook(infimoObject.updated),
+        };
+        this.lifeCycle.beforeCreate()
+
         this.name = infimoObject.name;
         this.unparsedMainNode = document.createElement("div");
         this.mainNode = document.createElement("div");
         this.template = infimoObject.template;
         this.componentsConstructors = infimoObject.components || [];
-        this.components = [];
         this.listeners = {};
         this.refs = [];
         this.componentProps = {};
@@ -38,6 +58,8 @@ export default class Component {
         this.data(infimoObject.data || {});
         this.watch(infimoObject.watch || {});
         this.methods(infimoObject.methods || {});
+
+        this.lifeCycle.created();
     }
 
     emit(event: string, ...args: any[]): void {
@@ -264,7 +286,7 @@ export default class Component {
             this.unparsedMainNode = element.cloneNode(true) as Element;
 
             element = await parseStructures(element, this, vm);
-            element = await parseComponents(element, this, vm);
+            element = await parseComponents(element, false, this, vm);
             element = await parseDataInsertion(element, this, vm);
 
             return element;
@@ -305,6 +327,7 @@ export default class Component {
         vm.initThis(this);
 
         const refThis = this;
+        await refThis.getLifeCycle().beforeUpdate();
 
         let counter = 0;
 
@@ -391,7 +414,7 @@ export default class Component {
 
             // parse elements
             virtualElement = await parseStructures(virtualElement, refThis, vm);
-            virtualElement = await parseComponents(virtualElement, refThis, vm);
+            virtualElement = await parseComponents(virtualElement, true, refThis, vm);
             virtualElement = await parseDataInsertion(virtualElement, refThis, vm);
 
             virtualElement = virtualElement.cloneNode(true) as Element;
@@ -406,9 +429,12 @@ export default class Component {
 
         // remove i-if elements from the tree that are set to be removed
         await parseRemovedElements(refThis);
+
+        await refThis.getLifeCycle().updated();
     }
 
     public async createMainNode(): Promise<void> {
+        await this.lifeCycle.beforeMount();
         this.mainNode = await this.parseTemplate(this.template);
     }
     
@@ -420,14 +446,13 @@ export default class Component {
         return this.mainNode;
     }
 
+    public getLifeCycle(): LifeCycle {
+        return this.lifeCycle;
+    }
+
     public getName(): string {
         return this.name;
     }
-
-    public getComponents(): Component[] {
-        return this.components;
-    }
-
     public getRemovedElements(): RemovedElements {
         return this.removedElements;
     }

@@ -452,8 +452,6 @@ export const parseSingleComponent = async (component: Component, componentElemen
         clonedElement.removeAttribute(prop);
     }
 
-    console.log(parsedProps);
-
     component.setProps(parsedProps);
 
     // Parse component events

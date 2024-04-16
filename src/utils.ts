@@ -503,8 +503,8 @@ export const parseComponents = async (element: Element, isHydrating: boolean, re
             const newElement = await parseSingleComponent(component, componentElement as Element, refThis, vm);
             componentElement.replaceWith(newElement);
             isHydrating
-                ? await component.getLifeCycle().updated()
-                : await component.getLifeCycle().mounted();
+                ? await component.callLifeCycleHook("updated", component)
+                : await component.callLifeCycleHook("mounted", component);
         }
 
         if (element.tagName.toLocaleLowerCase() === templateTagName) {
@@ -513,8 +513,8 @@ export const parseComponents = async (element: Element, isHydrating: boolean, re
             element.replaceWith(newElement);
             element = newElement;
             isHydrating
-                ? await component.getLifeCycle().updated()
-                : await component.getLifeCycle().mounted();
+                ? await component.callLifeCycleHook("updated", component)
+                : await component.callLifeCycleHook("mounted", component);
         }
     }
 

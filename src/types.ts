@@ -20,8 +20,10 @@ export type Prop<T> = {
     validatorMessage?: string
 } | TypeForProp;
 
+export type GenericObject = { [key: string]: any };
+
 export type PropsProp = { [key: string]: Prop<any> };
-export type DataProp = { [key: string]: any };
+export type DataProp = GenericObject;
 export type WatchProp = { [key: string]: (newValue?: any, oldValue?: any) => void };
 export type MethodsProp = { [key: string]: Function };
 export type ComponentsProp = ([string, () => Component])[]
@@ -50,12 +52,12 @@ export const enum PropType {
 };
 
 export type LifeCycle = {
-    beforeCreate: () => Promise<void>,
-    created: () => Promise<void>,
-    beforeMount: () => Promise<void>,
-    mounted: () => Promise<void>,
-    beforeUpdate: () => Promise<void>,
-    updated: () => Promise<void>,
+    beforeCreate: (refThis: GenericObject) => Promise<void>,
+    created: (refThis: GenericObject) => Promise<void>,
+    beforeMount: (refThis: GenericObject) => Promise<void>,
+    mounted: (refThis: GenericObject) => Promise<void>,
+    beforeUpdate: (refThis: GenericObject) => Promise<void>,
+    updated: (refThis: GenericObject) => Promise<void>,
 };
 
 export type RegisteredName = {name: string, type: PropType};

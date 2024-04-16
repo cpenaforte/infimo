@@ -11,10 +11,10 @@ const Button = Infimo.default.defineComponent({
         },
     },
     async mounted() {
-        console.log("Button mounted");
+        console.log("Button mounted"+this.message);
     },
     async updated() {
-        console.log("Button updated");
+        console.log("Button updated"+this.message);
     }, 
     data: {
         message: "Click me!"

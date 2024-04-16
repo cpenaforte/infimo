@@ -1,4 +1,4 @@
-import { ComponentsProp, DataProp, InfimoObject, LifeCycle, Listeners, MethodsProp, Prop, PropType, PropsProp, TypeConstructor, WatchProp } from "../types";
+import { ComponentsProp, DataProp, GenericObject, InfimoObject, LifeCycle, Listeners, MethodsProp, Prop, PropType, PropsProp, TypeConstructor, WatchProp } from "../types";
 import { parseDataInsertion, parseStructures, parseComponents, putUuid, updateAttributesAndChildren, putUnparsedInPlaceOfRemoved, parseRemovedElements } from "../utils";
 import EventBus from "./EventBus";
 import NameRegister from "./NameRegister";
@@ -20,11 +20,11 @@ export default class Component {
     private namesRegister: NameRegister;
     private removedElements: RemovedElements;
 
-    private parseLifeCycleHook = (hook?: () => Promise<void> | void): () => Promise<void> => {
+    private parseLifeCycleHook = (hook: (() => Promise<void> | void )| undefined): (refThis: GenericObject) => Promise<void> => {
         if (!hook) return async () => {};
 
-        return async () => {
-            const maybePromise = hook();
+        return async (refThis: GenericObject) => {
+            const maybePromise = hook.call(refThis);
             if (maybePromise instanceof Promise) {
                 await maybePromise;
             }
@@ -40,7 +40,7 @@ export default class Component {
             beforeUpdate: this.parseLifeCycleHook(infimoObject.beforeUpdate),
             updated: this.parseLifeCycleHook(infimoObject.updated),
         };
-        this.lifeCycle.beforeCreate()
+        this.callLifeCycleHook("beforeCreate");
 
         this.name = infimoObject.name;
         this.unparsedMainNode = document.createElement("div");
@@ -59,7 +59,7 @@ export default class Component {
         this.watch(infimoObject.watch || {});
         this.methods(infimoObject.methods || {});
 
-        this.lifeCycle.created();
+        this.callLifeCycleHook("created");
     }
 
     emit(event: string, ...args: any[]): void {
@@ -327,7 +327,7 @@ export default class Component {
         vm.initThis(this);
 
         const refThis = this;
-        await refThis.getLifeCycle().beforeUpdate();
+        await refThis.callLifeCycleHook("beforeUpdate", refThis);
 
         let counter = 0;
 
@@ -429,17 +429,23 @@ export default class Component {
 
         // remove i-if elements from the tree that are set to be removed
         await parseRemovedElements(refThis);
-
-        await refThis.getLifeCycle().updated();
+        
+        await refThis.callLifeCycleHook("updated", refThis);
     }
 
     public async createMainNode(): Promise<void> {
-        await this.lifeCycle.beforeMount();
+        await this.callLifeCycleHook("beforeMount");
         this.mainNode = await this.parseTemplate(this.template);
     }
     
     public async initialConditionalRemoves(): Promise<void> {
         await parseRemovedElements(this);
+    }
+
+    public async callLifeCycleHook(hook: string, refThis?: {[key: string]: any}): Promise<void> {
+        if (typeof this.lifeCycle[hook as keyof LifeCycle] === "function") {
+            await this.lifeCycle[hook as keyof LifeCycle](refThis || this);
+        }
     }
 
     public getMainNode(): Element {

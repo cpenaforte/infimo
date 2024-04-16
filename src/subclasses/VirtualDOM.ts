@@ -15,7 +15,7 @@ export default class VirtualDOM {
 
     public async mounted(): Promise<void> {
         await this.mainComponent.initialConditionalRemoves();
-        await this.mainComponent.getLifeCycle().mounted();
+        await this.mainComponent.callLifeCycleHook('mounted', this.mainComponent);
     }
 
     public getMainNode(): Element {

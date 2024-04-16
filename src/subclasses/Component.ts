@@ -332,6 +332,10 @@ export default class Component {
         let counter = 0;
 
         let associatedElementsLength = dataRef.getAssociatedElements().length;
+        if (associatedElementsLength === 0) {
+            await refThis.callLifeCycleHook("updated", refThis);
+            return;
+        }
 
         // loop through all associated elements and update them
         while (true) {

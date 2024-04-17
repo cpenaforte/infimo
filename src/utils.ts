@@ -146,10 +146,15 @@ export const parseListRendering = async (element: Element, refThis: { [key: stri
             if (value?.includes(item)) {
                 clone.setAttribute(
                     attr,
-                    value.replace(
-                        new RegExp(`[^\-<\/](${item})[^\->]`, "g"),
-                        (match) => match.replace(item, `${listName}[${i}]`)
-                    )
+                    value !== item
+                        ? value.replace(
+                            new RegExp(`[^\-\<\/](${item})`, "g"),
+                            (match) => match.replace(item, `${listName}[${i}]`)
+                        ).replace(
+                            new RegExp(`(${item})[^\-\>]`, "g"),
+                            (match) => match.replace(item, `${listName}[${i}]`)
+                        ) 
+                        : `${listName}[${i}]`
                 );
             }
         });
@@ -157,9 +162,12 @@ export const parseListRendering = async (element: Element, refThis: { [key: stri
         clone.setAttribute("data-source", `${listName}-${i}`);
         clone.innerHTML = clone.innerHTML
             .replace(
-                new RegExp(`[^\-<\/](${item})[^\->]`, "g"),
+                new RegExp(`[^\-\<\/](${item})`, "g"),
                 (match) => match.replace(item, `${listName}[${i}]`)
-            );
+            ).replace(
+                new RegExp(`(${item})[^\-\>]`, "g"),
+                (match) => match.replace(item, `${listName}[${i}]`)
+            ) ;
         
         await putUuid(clone, refThis);
 

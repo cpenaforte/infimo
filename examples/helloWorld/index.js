@@ -5,9 +5,9 @@ const Button = Infimo.default.defineComponent({
             type: String,
             required: true
         },
-        btnType: {
+        type: {
             type: String,
-            default: "button"
+            required: true
         },
     },
     async mounted() {
@@ -25,7 +25,7 @@ const Button = Infimo.default.defineComponent({
         }
     },
     template: `
-        <button type="button" @click="onClick">button: {{ btnText }}</button>
+        <button :type="type" @click="onClick">button: {{ btnText }}</button>
     `,
 });
 
@@ -78,7 +78,7 @@ new Infimo.default({
             <button i-else type="button" @click="()=>blink('ok')" disabled>Disabled</button>
             <ul>
                 <li>
-                    <Button i-for="button in btnList" :btn-text="\`\${button + inputValue}\`" :btn-type="undefined" @showClick="clickedButton"></Button>
+                    <Button i-for="button in btnList" :btn-text="\`\${button + inputValue}\`" :type="button" @showClick="clickedButton"></Button>
                 </li>
             </ul>
             <ul>

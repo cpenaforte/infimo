@@ -116,7 +116,7 @@ export default class Component {
                     throw new Error(`Prop ${parsedName} must be one of ${propDefinition}`);
                 }
             } else if (typeof propDefinition === "object") {
-                if (propDefinition.required && !value) {
+                if (propDefinition.required && (value === undefined || value === null)) {
                     throw new Error(`Prop ${parsedName} is required`);
                 }
                 if (value === undefined || value === null) {

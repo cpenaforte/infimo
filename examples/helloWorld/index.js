@@ -3,7 +3,7 @@ const Button = Infimo.default.defineComponent({
     props: {
         btnText: {
             type: String,
-            default: "Button text"
+            required: true
         },
         btnType: {
             type: String,

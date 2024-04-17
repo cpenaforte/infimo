@@ -107,6 +107,8 @@ export default class Component {
             const parsedName = name.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
             const propDefinition: Prop<any> = this.componentProps[parsedName];
 
+            if (parsedName === "dataSource") return;
+
             if (!propDefinition) {
                 throw new Error(`Prop ${parsedName} does not exist`);
             }

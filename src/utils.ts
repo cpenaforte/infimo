@@ -144,12 +144,22 @@ export const parseListRendering = async (element: Element, refThis: { [key: stri
         clone.getAttributeNames().forEach(attr => {
             const value = clone.getAttribute(attr);
             if (value?.includes(item)) {
-                clone.setAttribute(attr, value.replace(new RegExp(item, "g"), `${listName}[${i}]`));
+                clone.setAttribute(
+                    attr,
+                    value.replace(
+                        new RegExp(`[^\-<\/](${item})[^\->]`, "g"),
+                        (match) => match.replace(item, `${listName}[${i}]`)
+                    )
+                );
             }
         });
         clone.setAttribute("i-if", `${listName}[${i}]`);
         clone.setAttribute("data-source", `${listName}-${i}`);
-        clone.innerHTML = clone.innerHTML.replace(new RegExp(item, "g"), `${listName}[${i}]`);
+        clone.innerHTML = clone.innerHTML
+            .replace(
+                new RegExp(`[^\-<\/](${item})[^\->]`, "g"),
+                (match) => match.replace(item, `${listName}[${i}]`)
+            );
         
         await putUuid(clone, refThis);
 
@@ -457,6 +467,7 @@ export const parseSingleComponent = async (component: Component, componentElemen
     const componentNode = component.getMainNode();
     componentNode.setAttribute("data-uuid", (clonedElement as HTMLElement).dataset.uuid || (clonedElement.getAttribute("data-uuid") as string));
     componentNode.setAttribute("data-component", component.getName());
+    componentNode.setAttribute("data-source", (clonedElement as HTMLElement).dataset.source || (clonedElement.getAttribute("data-source")) || parsedProps["data-source"]);
 
     return componentNode;
 }

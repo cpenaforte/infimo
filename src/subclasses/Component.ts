@@ -107,10 +107,8 @@ export default class Component {
             const parsedName = name.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
             const propDefinition: Prop<any> = this.componentProps[parsedName];
 
-            if (parsedName === "dataSource") return;
-
             if (!propDefinition) {
-                throw new Error(`Prop ${parsedName} does not exist`);
+                return;
             }
 
             if (Array.isArray(propDefinition)) {
@@ -386,6 +384,11 @@ export default class Component {
                             .querySelector(`[data-uuid="${virtualUnparsedElement.parentElement?.getAttribute("data-uuid")}"]`)
                             ?.appendChild(clone.cloneNode(true));
                     }
+                    virtualUnparsedElement = refThis.unparsedMainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
+                    const updatedDataRef = refThis.refs.find(ref => ref.getName().name === dataRef.getName().name);
+                    if (!updatedDataRef) break;
+
+                    associatedElementsLength = updatedDataRef.getAssociatedElements().length;
                 }
             }
 

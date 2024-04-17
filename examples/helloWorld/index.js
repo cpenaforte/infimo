@@ -36,7 +36,7 @@ new Infimo.default({
         Button
     ],
     async mounted() {
-        this.btnList = ['ab','asd'];
+        this.btnList = ['ab','asd', 'sdadas', 'asdasd', 'sdasd'];
     },
     data: {
         message: "Hello World!",
@@ -77,8 +77,8 @@ new Infimo.default({
             <button i-if="inputValue" type="button" @click="() =>blink('ok')">Blink</button>
             <button i-else type="button" @click="()=>blink('ok')" disabled>Disabled</button>
             <ul>
-                <li i-for="number in btnList">
-                    <Button :btn-text="\`\${number + inputValue}\`" :btn-type="undefined" @showClick="clickedButton"></Button>
+                <li>
+                    <Button i-for="button in btnList" :btn-text="\`\${button + inputValue}\`" :btn-type="undefined" @showClick="clickedButton"></Button>
                 </li>
             </ul>
             <ul>

@@ -21,7 +21,6 @@ const Button = Infimo.default.defineComponent({
     },
     methods: {
         onClick() {
-            console.log(this);
             this.emit("showClick", this.btnText);
         }
     },
@@ -36,10 +35,14 @@ new Infimo.default({
     components: [
         Button
     ],
+    async mounted() {
+        this.btnList = ['ab','asd'];
+    },
     data: {
         message: "Hello World!",
         inputValue: "",
-        pOpacity: 1
+        pOpacity: 1,
+        btnList: ['ab','asd','asdc']
     },
     watch: {
         inputValue(newValue, oldValue) {
@@ -60,6 +63,9 @@ new Infimo.default({
         },
         clickedButton(arg) {
             console.log("Button clicked! "+arg);
+            this.btnList.push("new");
+            this.btnList = [...this.btnList];
+            console.log(this.btnList);
         }
     },
     template: `
@@ -71,7 +77,7 @@ new Infimo.default({
             <button i-if="inputValue" type="button" @click="() =>blink('ok')">Blink</button>
             <button i-else type="button" @click="()=>blink('ok')" disabled>Disabled</button>
             <ul>
-                <li i-for="number in ['ab','asd','asdc']">
+                <li i-for="number in btnList">
                     <Button :btn-text="\`\${number + inputValue}\`" :btn-type="undefined" @showClick="clickedButton"></Button>
                 </li>
             </ul>

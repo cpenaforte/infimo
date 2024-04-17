@@ -1,5 +1,5 @@
 import { ComponentsProp, DataProp, GenericObject, InfimoObject, LifeCycle, Listeners, MethodsProp, Prop, PropType, PropsProp, TypeConstructor, WatchProp } from "../types";
-import { parseDataInsertion, parseStructures, parseComponents, putUuid, updateAttributesAndChildren, putUnparsedInPlaceOfRemoved, parseRemovedElements } from "../utils";
+import { parseDataInsertion, parseStructures, parseComponents, putUuid, updateAttributesAndChildren, putUnparsedInPlaceOfRemoved, parseRemovedElements, removeUuid } from "../utils";
 import EventBus from "./EventBus";
 import NameRegister from "./NameRegister";
 import Ref from "./Ref";
@@ -19,17 +19,6 @@ export default class Component {
     private componentProps : PropsProp;
     private namesRegister: NameRegister;
     private removedElements: RemovedElements;
-
-    private parseLifeCycleHook = (hook: (() => Promise<void> | void )| undefined): (refThis: GenericObject) => Promise<void> => {
-        if (!hook) return async () => {};
-
-        return async (refThis: GenericObject) => {
-            const maybePromise = hook.call(refThis);
-            if (maybePromise instanceof Promise) {
-                await maybePromise;
-            }
-        }
-    }
 
     constructor(infimoObject: InfimoObject, eventBus: EventBus) {
         this.lifeCycle = {
@@ -60,6 +49,17 @@ export default class Component {
         this.methods(infimoObject.methods || {});
 
         this.callLifeCycleHook("created");
+    }
+
+    private parseLifeCycleHook = (hook: (() => Promise<void> | void )| undefined): (refThis: GenericObject) => Promise<void> => {
+        if (!hook) return async () => {};
+
+        return async (refThis: GenericObject) => {
+            const maybePromise = hook.call(refThis);
+            if (maybePromise instanceof Promise) {
+                await maybePromise;
+            }
+        }
     }
 
     emit(event: string, ...args: any[]): void {
@@ -329,10 +329,12 @@ export default class Component {
         const refThis = this;
         await refThis.callLifeCycleHook("beforeUpdate", refThis);
 
+        const updatedDataRef = refThis.refs.find(ref => ref.getName().name === dataRef.getName().name);
+
         let counter = 0;
 
-        let associatedElementsLength = dataRef.getAssociatedElements().length;
-        if (associatedElementsLength === 0) {
+        let associatedElementsLength = updatedDataRef?.getAssociatedElements().length;
+        if (!associatedElementsLength) {
             await refThis.callLifeCycleHook("updated", refThis);
             return;
         }
@@ -341,12 +343,49 @@ export default class Component {
         while (true) {
             const updatedDataRef = refThis.refs.find(ref => ref.getName().name === dataRef.getName().name);
             if (!updatedDataRef) break;
-            
+
             associatedElementsLength = updatedDataRef.getAssociatedElements().length;
+            if (counter >= associatedElementsLength) break;
+
             const associatedElement = updatedDataRef.getAssociatedElements()[counter];
 
             let virtualUnparsedElement = refThis.unparsedMainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
             let virtualElement = refThis.mainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
+            
+            if (virtualUnparsedElement?.hasAttribute("data-source") && virtualElement?.hasAttribute("data-source")) {
+                const listKey = virtualUnparsedElement.getAttribute("data-source");
+                const [listName, index] = listKey?.split("-") || [];
+                const listValue = refThis[listName as keyof typeof refThis];
+
+                if (listName && index
+                    && !isNaN(Number(index))
+                    && listValue
+                    && Array.isArray(listValue)
+                    && virtualUnparsedElement.nextElementSibling === null
+                    && Number(index) + 1 < listValue.length
+                ) {
+                    for (let counter=Number(index) + 1;counter < listValue.length; ++counter) {
+                        const clone = virtualUnparsedElement.cloneNode(true) as Element;
+                        
+                        removeUuid(clone);
+                        
+                        clone.getAttributeNames().forEach(attr => {
+                            const value = clone.getAttribute(attr);
+                            if (value?.includes(listName)) {
+                                clone.setAttribute(attr, value.replace(new RegExp(`${listName}\[[0-9]+\]`, "g"), `${listName}[${counter}]`));
+                            }
+                        });
+                        clone.setAttribute("data-source", `${listName}-${counter}`);
+                        clone.innerHTML = clone.innerHTML.replace(new RegExp(`${listName}\[[0-9]+\]`, "g"), `${listName}[${counter}]`);
+                        
+                        await putUuid(clone, refThis);
+
+                        refThis.unparsedMainNode
+                            .querySelector(`[data-uuid="${virtualUnparsedElement.parentElement?.getAttribute("data-uuid")}"]`)
+                            ?.appendChild(clone.cloneNode(true));
+                    }
+                }
+            }
 
             // Put unparsed element in place of removed i-if element
             if (virtualUnparsedElement && (!virtualElement || virtualUnparsedElement?.hasAttribute("i-if"))) {
@@ -363,6 +402,12 @@ export default class Component {
 
                 if ((refThis.mainNode as HTMLElement).dataset.uuid === associatedElement.uuid) {
                     virtualElement = refThis.mainNode;
+                }
+
+                if (virtualUnparsedElement?.hasAttribute("i-for")) {
+                    const parentUuid = virtualUnparsedElement.parentElement;
+                    refThis.mainNode.querySelector(`[data-uuid="${parentUuid}"]`)?.appendChild(virtualUnparsedElement.cloneNode(true));
+                    virtualElement = refThis.mainNode.querySelector(`[data-uuid="${associatedElement.uuid}"]`);
                 }
 
                 if (!virtualUnparsedElement || !virtualElement) {
@@ -416,11 +461,12 @@ export default class Component {
                 }
             }
 
+
             // parse elements
             virtualElement = await parseStructures(virtualElement, refThis, vm);
             virtualElement = await parseComponents(virtualElement, true, refThis, vm);
             virtualElement = await parseDataInsertion(virtualElement, refThis, vm);
-
+            
             virtualElement = virtualElement.cloneNode(true) as Element;
             
             // update attributes and children in the DOM

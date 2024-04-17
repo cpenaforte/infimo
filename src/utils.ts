@@ -135,24 +135,23 @@ export const parseListRendering = async (element: Element, refThis: { [key: stri
 
     if (!Array.isArray(listValue)) throw new Error("i-for must have an array");
 
-    for (const value of listValue) {
+    for (let i=0; i < listValue.length; ++i) {
         const clone = element.cloneNode(true) as Element;
 
         clone.removeAttribute("i-for");
         removeUuid(clone);
         
-        await putUuid(clone, refThis);
-        const cloneUuid = (clone as HTMLElement).dataset.uuid as string;
-        
-        Object.assign(refThis, {
-            forVariables: {
-                ...((refThis as any)?.forVariables || {}),
-                [cloneUuid]: {
-                    ...(((refThis as any)?.forVariables || {})[cloneUuid] || {}),
-                    [item]: value
-                }
-            } 
+        clone.getAttributeNames().forEach(attr => {
+            const value = clone.getAttribute(attr);
+            if (value?.includes(item)) {
+                clone.setAttribute(attr, value.replace(new RegExp(item, "g"), `${listName}[${i}]`));
+            }
         });
+        clone.setAttribute("i-if", `${listName}[${i}]`);
+        clone.setAttribute("data-source", `${listName}-${i}`);
+        clone.innerHTML = clone.innerHTML.replace(new RegExp(item, "g"), `${listName}[${i}]`);
+        
+        await putUuid(clone, refThis);
 
         // Append list elements to unparsed dom
         refThis.appendElementToVirtualUnparsedMainNode(
@@ -180,17 +179,6 @@ export const parseListRendering = async (element: Element, refThis: { [key: stri
     return element;
 }
 
-export const parseForVariables = (element: Element, refThis: { [key: string] : any }): { [key: string] : any } => {
-    // If element don't have a uuid as key of refThis.forVariables, repeat with the parent node
-    const variables = ((refThis?.forVariables || {})[(element as HTMLElement).dataset.uuid as string] || {});
-
-    if (!Object.keys(variables).length && element.parentElement && (element.parentElement as HTMLElement).dataset.uuid) {
-        return parseForVariables(element.parentElement, refThis);
-    }
-
-    return Object.assign(refThis, variables);
-}
-
 export const removeElement = (condition: boolean, element: Element, refThis: {[key: string]: any}): void => {
     if (condition) {
         refThis.removedElements?.add(element);
@@ -204,10 +192,8 @@ export const parseConditionalRendering = async (element: Element, refThis: { [ke
     const condition = element.getAttribute("i-if");
     if (!condition?.length) return element;
 
-    const parsedThis = parseForVariables(element, refThis);
-    
     const vm = virtualMachine || new VirtualMachine();
-    vm.initThis(parsedThis);
+    vm.initThis(refThis);
 
     const sibling = element.nextElementSibling;
 
@@ -240,9 +226,8 @@ export const replaceBracesCode = (text: string, vm: VirtualMachine): string => {
 export const parseBracesCode = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
     let clonedElement = element;
 
-    const parsedThis = parseForVariables(clonedElement, refThis);
     const vm = virtualMachine || new VirtualMachine();
-    vm.initThis(parsedThis);
+    vm.initThis(refThis);
     
     for( let child of clonedElement.childNodes) {
         if (child.nodeType === 3) {
@@ -261,10 +246,8 @@ export const parseCustomAttributes = async (element: Element, refThis: { [key: s
     if (custom) {
         element.removeAttribute("custom-attr");
 
-        const parsedThis = parseForVariables(element, refThis);
-
         const vm = virtualMachine || new VirtualMachine();
-        vm.initThis(parsedThis);
+        vm.initThis(refThis);
 
         const evalutated = vm.runScriptSync(custom);
 
@@ -321,10 +304,8 @@ export const parseModelAttributes = async (element: Element, refThis: { [key: st
         element.removeAttribute(modelAttr);
 
         if (modelValue) {
-            const parsedThis = parseForVariables(element, refThis);
-
             const vm = virtualMachine || new VirtualMachine();
-            vm.initThis(parsedThis);
+            vm.initThis(refThis);
     
             const evalutated = vm.runScriptSync(modelValue);
     
@@ -348,10 +329,8 @@ export const parseModelAttributes = async (element: Element, refThis: { [key: st
 }
 
 export const parseComputedAttributes = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
-    const parsedThis = parseForVariables(element, refThis);
-    
     const vm = virtualMachine || new VirtualMachine();
-    vm.initThis(parsedThis);
+    vm.initThis(refThis);
     
     const computedAttrs = element.getAttributeNames().filter(attr => attr.startsWith(":"));
 
@@ -369,10 +348,8 @@ export const parseComputedAttributes = async (element: Element, refThis: { [key:
 }
 
 export const parseComputedEvents = async (element: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
-    const parsedThis = parseForVariables(element, refThis);
-    
     const vm = virtualMachine || new VirtualMachine();
-    vm.initThis(parsedThis);
+    vm.initThis(refThis);
     
     const computedEvents = element.getAttributeNames().filter(attr => attr.startsWith("@"));
 
@@ -426,10 +403,8 @@ export const parseDataInsertion = async (element: Element, refThis: { [key: stri
 
 export const parseSingleComponent = async (component: Component, componentElement: Element, refThis: { [key: string] : any }, virtualMachine?: VirtualMachine): Promise<Element> => {
     // parse i-for variables
-    const parsedThis: typeof refThis = parseForVariables(componentElement, refThis);
-
     const vm = virtualMachine || new VirtualMachine();
-    vm.initThis(parsedThis);
+    vm.initThis(refThis);
 
     const clonedElement = componentElement.cloneNode(true) as Element;
 
@@ -467,7 +442,7 @@ export const parseSingleComponent = async (component: Component, componentElemen
 
         const uuid = (clonedElement as HTMLElement).dataset.uuid || (clonedElement.getAttribute("data-uuid")) || component.getName();
 
-        (parsedThis.eventBus as EventBus).on(eventName, eventFunction, uuid);
+        (refThis.eventBus as EventBus).on(eventName, eventFunction, uuid);
 
         clonedElement.removeAttribute(event);
     }

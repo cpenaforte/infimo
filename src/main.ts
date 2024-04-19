@@ -25,10 +25,10 @@ class InfimoFactory {
         if (app) {
             app.parentElement?.replaceChild(mainNode, app);
         }
-
-        await virtualDOM.mounted();
         
         Object.assign(appThis, this);
+
+        await virtualDOM.mounted();
     }
 
     public static defineComponent(infimoObject: InfimoObject): [string, () => Component] {

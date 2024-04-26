@@ -22,7 +22,7 @@ Something like `<div id="infimo"></div>` is perfect for it.
 Then, in your JS file, if you are using the NPM package method, add `import Infimo from 'infimo';`.
 
 ### Building
-To create an Infimo object and build it to your page, follow the example below.
+To build Infimo in your page, follow the example below.
 ```
 new Infimo({
     name: "Main",
@@ -32,7 +32,7 @@ new Infimo({
 }).build(this || {}, "#infimo");
 ```
 
-_Note: if you are getting an error in console that says the Infimo package doesn't have a default export, try changing `new Infimo` to `new Infimo.default`_
+_Note: if you are getting an error in console that says the Infimo package doesn't have a default export, try changing `Infimo` to `Infimo.default`_
 
 ## Infimo Object
 That are 6 keys you may use in Infimo Object as well as 6 lifecycle hooks
@@ -53,5 +53,16 @@ The keys can't have the name of an existing data variable.
 4. **mounted**: Executed after render. May be render-blocking, depending on the function call itself.
 5. **beforeUpdate** : Executed before updating the view. May be render-blocking, depending on the function call itself.
 6. **updated**: Executed after updating the view. May be render-blocking, depending on the function call itself.
+
+## Components
+To create a Infimo Component, follow the example below.
+```
+export default Infimo.defineComponent({
+    name: "Component", // you should put the same name as the imported file name
+    template: `
+        <div>Hello world</div>
+    `
+})
+```
 
 Check the _examples_ folder in this project to learn more of the features of Infimo.

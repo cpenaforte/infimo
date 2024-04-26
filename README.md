@@ -25,6 +25,7 @@ Then, in your JS file, if you are using the NPM package method, add `import Infi
 To create an Infimo object and build it to your page, follow the example below.
 ```
 new Infimo({
+    name: "Main",
     template: `
         <div>Hello world</div>
     `

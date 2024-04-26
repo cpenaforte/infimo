@@ -1,5 +1,5 @@
 # Infimo
-A minimal js reactive lib for small or SEO focused websites
+A minimalist JS lib for building reactive light-weight web apps.
 
 ## Importing
 You can either import it via CDN or importing the NPM package.
